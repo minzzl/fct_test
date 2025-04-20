@@ -1,0 +1,61 @@
+VERSION:
+  kernel: "5.15.174-b0-saturn"
+  ram: "1.0.0"
+  serial: "serial_number"
+  model: "PACPIA000.AKM"
+  app: "com.acp.energy,com.acp.lgapcomm,com.acp.logics,com.acp.mailer,com.acp.mqttbroker,com.acp.mqttpublisher,com.acp.quickinstall,com.acp.restserver,com.acp.tmsclient,com.acp.trends,com.acp.flat,com.acp.cycle,com.acp.energynavigation,com.acp.energyusage,com.acp.peakdemand,com.acp.peakdemandcontrol"
+  enable: true
+  repeat: 1
+WIFI:
+  name: wlan0
+  address: 192.168.1.100
+  ssid: next_test
+  password: 12347890
+  enable: true
+  max: -40
+  min: -60
+  repeat: 1
+  order: 1
+ETH:
+  address: 192.168.1.100
+  mac: "123456"
+  enable: true
+  repeat: 1
+  order: 2
+BLUETOOTH:
+  mac: "8A:88:4B:60:1F:FF"
+  enable: true
+  max: -40
+  min: -60
+  repeat: 1
+  order: 3
+DIO:
+  enable: true
+  repeat: 1
+  order: 4
+UART:
+  boadrate: 9600
+  data: 256
+  enable: true
+  repeat: 1
+  order: 5
+USB:
+  enable: true
+  repeat: 1
+  order: 6
+TOUCH:
+  enable: true
+  repeat: 1
+  order: 11
+PWM:
+  enable: true
+  repeat: 1
+  order: 12
+LCD:
+  enable: true
+  repeat: 1
+  order: 13
+RTC:
+  enable: true
+  repeat: 1
+  order: 14
