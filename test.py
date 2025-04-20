@@ -1,373 +1,527 @@
-import argparse
-import time
+#!/usr/bin/env python3
+
+import subprocess
 import os
-import platform
-import pandas as pd
-import pexpect
-import threading
-import subprocess
-import yaml
 from datetime import datetime
-import platform
-import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import yaml
+import shutil
+import sys
+import select
+import multiprocessing
+import json
 
-# 상수 정의
-CHECK_INTERVAL = 1  # 1초마다 체크
-SSH_TIMEOUT = 30
-SSH_PROMPT = r'\[root@webOSNano-unofficial ~\]#'
-EXCEL_FILE = 'local_file.xlsx'
 
-# 현재 행 인덱스를 저장할 변수
-current_row_index = 0
-connection_status = False  # 연결 상태를 저장할 변수
-lock = threading.Lock()  # 스레드 안전을 위한 락
 
-def find_next_row_index():
-    """Find the next row index where 'Check' is empty or 'X'."""
-    global current_row_index
+subprocess.run("dmesg -n 1", shell=True)
+# subprocess.run("mount -o rw,remount /", shell=True)
+
+
+def get_log_datetime():
+    # 현재 시스템 시간을 읽어와서 포맷팅합니다.
+    log_datetime = datetime.now().strftime('%Y-%m-%d %H:%M')
+    return log_datetime
+
+log_datetime = get_log_datetime()
+# 테스트 진행 중 출력 예시
+print("========================================")
+print("              TEST IN PROGRESS         ")
+print("========================================")
+print(f"Log date and time: {log_datetime}")
+
+# YAML 파일 읽기
+with open('/lg_rw/fct_test/cfg.yml', 'r') as file:
+    config = yaml.safe_load(file)
+
+
+# 이더넷 맥 주소 읽기
+def get_wired_addr():
+    cmd = "luna-send -n 1 -f luna://com.webos.service.systemservice/deviceInfo/query '{}'"
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    
     try:
-        df = pd.read_excel(EXCEL_FILE)
-        for index, row in df.iterrows():
-            if pd.isna(row['Check']) or row['Check'] == 'X':
-                current_row_index = index
-                return True
-        print("[x] No available rows found.")
-        return False
-    except Exception as e:
-        print(f"[x] Failed to find next row index: {e}")
-        return False
-
-
-def check_ssh_connection(host, username, password="allnewb2b^^"):
-   """SSH 연결을 확인하며 비밀번호 입력을 추가 (Windows/Linux 구분)"""
-   print(f"[...] Checking SSH connection to {host} as {username}")
-   if platform.system() == "Windows":
-       ssh_command = f"ssh -o StrictHostKeyChecking=no {username}@{host} echo connected"
-       process = subprocess.Popen(ssh_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-       stdout, stderr = process.communicate(input=f"{password}\n")
-       if "connected" in stdout:
-           print("[v] SSH Connection OK")
-           return True
-       else:
-           print("[x] SSH Connection FAIL")
-           return False
-   else:
-       try:
-           ssh_command = f"ssh -o StrictHostKeyChecking=no {username}@{host}"
-           child = pexpect.spawn(ssh_command, timeout=SSH_TIMEOUT)
-           index = child.expect(["password:", pexpect.EOF, pexpect.TIMEOUT])
-           if index == 0:
-               child.sendline(password)
-               child.expect("#")
-               child.sendline("exit")
-               print("[v] SSH Connection OK")
-               return True
-           else:
-               print("[x] SSH Connection FAIL")
-               return False
-       except Exception as e:
-           print(f"[x] SSH Connection FAIL ({e})")
-           return False
-
-
-def read_sn_mac_from_file():
-    """엑셀 파일에서 SN과 MAC 주소를 읽습니다."""
-    try:
-        df = pd.read_excel(EXCEL_FILE)
-        if df.empty or current_row_index >= len(df):
-            print("[x] Excel FAIL (No more rows to read)")
-            return False, None, None
-        
-        serial_number = df.at[current_row_index, 'Serial Number']
-        mac_address = df.at[current_row_index, 'Eth Address']
-        serial_number = str(serial_number).strip()
-        mac_address = str(mac_address).strip()
-        return True, serial_number, mac_address
-    except Exception as e:
-        print(f"[x] Excel read FAIL ({e})")
-        return False, None, None
-
-
-def execute_ssh_command(host, username, command, password="allnewb2b^^"):
-    """비밀번호 입력 후 SSH 명령 실행 (Windows/Linux 구분)"""
-    # print(f"[DEBUG] Executing SSH command on {host} as {username}")
-    # print(f"[DEBUG] Command: {command}")
-
-    if platform.system() == "Windows":
-        ssh_command = f"ssh -o StrictHostKeyChecking=no {username}@{host} {command}"
-        process = subprocess.Popen(ssh_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = process.communicate(input=f"{password}\n")
-        # print(f"[DEBUG] Process stdout: {stdout.strip()}")
-        # print(f"[DEBUG] Process stderr: {stderr.strip()}")
-        return stdout.strip() if stdout else None
-    else:
-        try:
-            # SSH 명령어를 한 번에 실행
-            ssh_command = f"ssh -o StrictHostKeyChecking=no {username}@{host} '{command}'"
-            # print(f"[DEBUG] Linux SSH command: {ssh_command}")
-            child = pexpect.spawn(ssh_command, timeout=SSH_TIMEOUT)
-            index = child.expect(["password:", pexpect.EOF, pexpect.TIMEOUT])
-            if index == 0:
-                # print("[DEBUG] Password prompt received, sending password...")
-                child.sendline(password)
-                child.expect(pexpect.EOF)  # 명령어 실행 후 EOF를 기다림
-                output = child.before.decode("utf-8").strip()
-                # print(f"[DEBUG] Command output: {output}")
-                return output
-            return None
-        except Exception as e:
-            print(f"[x] SSH execute command error: {e}")
-            return None
-
-def write_sn_mac_to_board(sn, mac, host, username, password="allnewb2b^^"):
-   
-    """보드에 SN과 MAC 주소를 SSH를 통해 쓰고 확인 (Windows/Linux 구분)"""
-    print(f"[...] Writing SN ({sn}) and MAC ({mac}) to board {host}")
-
-    if platform.system() == "Windows":
-        write_command = f"echo {sn} > /persist/serial_number && /usr/bin/misc-util ETH_MAC {mac} && echo PACPIA000.AKM > /persist/model_number"
-        check_command = f"cat /persist/serial_number && /usr/bin/misc-util ETH_MAC"
-        ssh_command = f"ssh -o StrictHostKeyChecking=no {username}@{host} \"{write_command}\""
-        process = subprocess.Popen(ssh_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        process.communicate(input=f"{password}\n")
-        ssh_command_check = f"ssh -o StrictHostKeyChecking=no {username}@{host} \"{check_command}\""
-        process_check = subprocess.Popen(ssh_command_check, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, _ = process_check.communicate(input=f"{password}\n")
-
-    else:
-        write_command = f"echo {sn} > /persist/serial_number && /usr/bin/misc-util ETH_MAC {mac}"
-        check_command = "cat /persist/serial_number && /usr/bin/misc-util ETH_MAC && cat /persist/model_number"
-        execute_ssh_command(host, username, write_command)
-        stdout = execute_ssh_command(host, username, check_command)
-
-    if stdout:
-        lines = stdout.split("\n")
-        written_sn = lines[0].strip()
-        written_mac = lines[1].strip() if len(lines) > 1 else None
-        written_model = lines[2].strip() if len(lines) > 2 else None
-        if written_sn == sn and written_mac == mac and written_model == "PACPIA000.AKM":
-            print("[v] Serial Number write OK")
-            print("[v] Eth MAC Addr write OK")
-            print("[v] Model Number write OK")
-            return True
+        response = json.loads(result.stdout)
+        wired_addr = response.get("wired_addr", None)
+        if wired_addr:
+            # ":" 문자를 제거하고 소문자로 변환
+            wired_addr = wired_addr.replace(":", "").lower()
+            return wired_addr
         else:
-            print("[x] Serial Number or MAC write FAIL")
-            print("Intended ------------------------- actual")
-            print(f"Serial number : {sn} ------------ {written_sn}")
-            print(f"eth mac address : {mac} -------- {written_mac}")
-            print(f"Model Number : PACPIA000.AKM ---- {written_model}")
-            return False
-    return False
+            print("[log] wired_addr not found")
+            return "None"
+    except json.JSONDecodeError:
+        print("[log] Invalid JSON data")
+        return "None"
 
-def update_check_column():
-    """엑셀 파일의 'Check' 열을 업데이트합니다."""
-    global current_row_index
-    try:
-        df = pd.read_excel(EXCEL_FILE, dtype={'Check': str})
-        if df.empty:
-            print("[v] Execl Check FAIL (Empty)")
-            return False
-        
-        df.at[current_row_index, 'Check'] = 'O'
-        df.to_excel(EXCEL_FILE, index=False)
-        print("[v] Execl Check OK")
-        return True
-    except Exception as e:
+eth_mac = get_wired_addr()
 
-        print(f"[v] Execl Check FAIL ({e})")
-        return False
+# 로그 파일 설정
+log_file_path = '/lg_rw/fct_test/fct_test.log'
+usb_log_file_path = f"interface_{eth_mac}.log"
 
-"""
-def start_fct_test(hostIp):
-    ssh_command = f"ssh -o StrictHostKeyChecking=no root@{hostIp} python3 /lg_rw/fct_test/test_start_dq1.py "
-    
-    try:
-        child = pexpect.spawn(ssh_command)
-        child.interact()
+# 로그 파일에 날짜 기록
+with open(log_file_path, 'a') as log_file:
+    log_file.write("###############################################################\n")
+    log_file.write(f"Test started at: {log_datetime}\n")
 
-    except Exception as e:
-        print(f"Err: {e}")
+# 테스트 항목, 스크립트, 순서
+test_items = {
+    'VERSION': ['sw_version_test.py',0],
+    'WIFI': ['wlan0_test.py',0],
+    'ETH': ['eth0_test.sh',0],
+    'BLUETOOTH': ['ble_test.py',0],
+    'DIO': ['dio_test.py',0],
+    'RTC': ['rtc_test.py',0],
+    'UART': ['485test.py',0],
+    'PWM': ['pwm_test.py',0],
+    'USB': ['usb_test.py',0],
+    'TOUCH': ['touch_test.py',0],
+    'LCD': ['lcd_test.py',0],
+}
 
-"""
+# 기본 설정값
+default_config = {
+    'VERSION': {'kernel': "", 'ram': "", "serial": "", "app" : "", "model": "" },
+    'UART': {'boadrate': 115200, 'data': 256},
+    'WIFI': {'ssid': 'next_test','name': 'wlan0', 'address': '192.168.0.1', 'password': '12345678', 'min': -60, 'max': -40},
+    'ETH': {'address': '192.168.0.1', "mac":""},
+    'BLUETOOTH': {'mac': '00:00:00:00:00:00','min': -60, 'max': -40},
+    'USB': {'file_path': '/lg_rw/fct_test', 'data': 1}
+}
 
-def start_fct_test(hostIp, username, password="allnewb2b^^"):
-    """FCT 테스트 시작을 위해 SSH 접속 및 실행 (Windows/Linux 구분)"""
-    print("[...] Starting FCT Test")
-    ssh_command = f"ssh -o StrictHostKeyChecking=no {username}@{hostIp} python3 /lg_rw/fct_test/test_start_dq1.py"
+# 값의 범위 설정
+valid_ranges = {
+    'UART': {'boadrate': [4800, 9600, 19200, 38400, 57600, 115200], 'data': range(1, 256+1)},
+    'WIFI': {'name': str, 'address':str},
+    'ETH': {'address':str },
+    'BLUETOOTH': {'mac': str},
+}
 
-    if platform.system() == "Windows":
-        process = subprocess.Popen(ssh_command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = process.communicate(input=f"{password}\n")
-        print(stdout)
-        return True
+# 실시간 출력을 처리하는 함수
+def run_test_script(script, args):
+    # 실행파일이 파이썬인 경우
+    if script.endswith('.py'):
+        command = f"python3 -u {script} {args}"  # -u 플래그 추가
     else:
-        try:
-            child = pexpect.spawn(ssh_command, timeout=SSH_TIMEOUT)
-            index = child.expect(["password:", pexpect.EOF, pexpect.TIMEOUT])
-            if index == 0:
-                print("[DEBUG] Password prompt received, sending password...")
-                child.sendline(password)
-
-            # 명령어 실행 후 실시간으로 출력 읽기
-            while True:
-                try:
-                    # 다음 출력이 있을 때까지 대기
-                    output = child.readline().decode("utf-8", errors="ignore").strip()
-                    if output:
-                        print(output)
-                        if 'y/n' in output:
-                            user_input = input('Enter y or n: ')
-                            child.sendline(user_input)
-                except pexpect.EOF:
-                    break
-                except pexpect.TIMEOUT:
-                    continue
-
-            print("[v] FCT Test Completed")
-            return True
-        except Exception as e:
-            print(f"Err: {e}")
-            return False
-
-def remove_known_host(known_hosts_path, hostIp):
-    if os.path.exists(known_hosts_path):
-        with open(known_hosts_path, 'r') as file:
-            known_hosts = file.readlines()
-        
-        # 호스트가 known_hosts에 존재하는지 확인
-        host_found = any(hostIp in line for line in known_hosts)
-        
-        if host_found:
-            print(f"[log] Removing {hostIp} from known_hosts...")
-            subprocess.run(f"ssh-keygen -R {hostIp}", shell=True)
-        return True
-        
-    else:
-        print(f"[log] {known_hosts_path} does not exist.")
-        return False
+        command = f"{script} {args}"
 
 
-
-def send_time_now(username, hostIp, password="allnewb2b^^"):
-    """현재 시간을 보드에 전송"""
-    now = datetime.now()
-    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[...] Sending current time ({current_time}) to {hostIp}")
-    if platform.system() == "Windows":
-        write_command = f"echo {current_time} > /home/root/current_time"
-        read_command = "cat /home/root/current_time"
-        ssh_command = f"ssh -o StrictHostKeyChecking=no {username}@{hostIp} \"{write_command}\""
-        subprocess.run(ssh_command, shell=True, input=f"{password}\n", text=True)
-        ssh_command_check = f"ssh -o StrictHostKeyChecking=no {username}@{hostIp} \"{read_command}\""
-        process_check = subprocess.Popen(ssh_command_check, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, _ = process_check.communicate(input=f"{password}\n")
-    else:
-       write_command = f"echo {current_time} > /home/root/current_time"
-       read_command = "cat /home/root/current_time"
-       execute_ssh_command(hostIp, username, write_command)
-       stdout = execute_ssh_command(hostIp, username,read_command)
-    read_time = stdout.strip() if stdout else None
-    if read_time == current_time:
-        print("[v] Time write OK")
-        return True
-    else:
-       print("[x] Time write FAIL")
-       return False
-
-
-def write_cfg_to_board(new_mac, new_serial, hostIp, username, password="allnewb2b^^"):
-    """보드에 새로운 cfg.yml 파일을 생성하고 전송"""
-    print(f"[...] Writing cfg.yml with MAC: {new_mac}, Serial: {new_serial} to {hostIp}")
-
-    # 현재 디렉토리에서 cfg.yml 파일 읽기
-    with open('new_cfg.yml', 'r') as file:
-        cfg_data = yaml.safe_load(file)  # YAML 파일을 파싱
-
-    # MAC 주소와 Serial 번호 수정
-    cfg_data['ETH']['mac'] = new_mac
-    cfg_data['VERSION']['serial'] = new_serial
-
-    # 수정된 내용을 다시 YAML 형식으로 저장
-    with open('new_cfg.yml', 'w') as file:
-        yaml.dump(cfg_data, file)
-
-    # SSH 명령어를 통해 원격 서버에 파일 내용 쓰기
-    if platform.system() == "Windows":
-        check_command = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no root@{hostIp} \"cat > /lg_rw/fct_test/cfg.yml\""
-    else:
-        check_command = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no root@{hostIp} 'cat > /lg_rw/fct_test/cfg.yml'"
-
-    try:
-        # subprocess.Popen을 사용하여 파일 내용을 전송
-        with open('new_cfg.yml', 'rb') as file:
-            process = subprocess.Popen(check_command, shell=True, stdin=subprocess.PIPE)
-            process.communicate(input=file.read())
-            
-        
-        print("[v] cfg write OK")  # 성공 메시지 출력
-        return True
-
-    except subprocess.CalledProcessError as e:
-        print(f"[x] cfg write FAIL {e.stderr.decode().strip()}")
-        return False
-    except Exception as e:
-        print(f"[x] cfg write FAIL {e}")
-        return False
-
-
-def main(hostIp, username):
-
-    # known host 삭제
-    known_hosts_path = os.path.expanduser("~/.ssh/known_hosts")
-    if not remove_known_host(known_hosts_path, hostIp):
-        return
-
-    # Find the next row index to start processing
-    if not find_next_row_index():
-        return
-
-    
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True,  # 텍스트 모드로 스트림 처리
+        bufsize=1,  # 라인 버퍼링
+        env={**os.environ, 'PYTHONUNBUFFERED': '1'}  # PYTHONUNBUFFERED 환경 변수 설정
+    )
+    log_lines = []
+    last_line = ""
 
     while True:
-        print("*********** Do you want to start FCT ? ***********")
-        user_input = input(" Please answer (y/n): ").strip().lower()
-        if user_input == 'y':
-            while True:
-                if check_ssh_connection(hostIp, username):
-                    print("==================Connection OK========================")
-                    read_result, sn, mac = read_sn_mac_from_file()
-                    if read_result:
-                        print(f"[Serial Number] {sn}\n[ MAC Address ] {mac}")
-                        #맥주소 00:1A:2B:3C:4D:5F 되어있을 경우 : 지우기
-                        mac = mac.replace(":", "")
-
-                        if write_sn_mac_to_board(sn, mac, hostIp, username,"allnewb2b^^"):
-                            #colum date
-                            if update_check_column():
-                                #cfg 파일 전송
-                                if write_cfg_to_board(mac,sn,hostIp,username):
-                                    if send_time_now(username, hostIp):
-                                        #fct 시작
-                                        if start_fct_test(hostIp,username):
-                                            print("[v] FCT OK")
-                                            print("================== Please replace the board for the next test ==================")
-                                            time.sleep(20)            
-                                            break
-        elif user_input == 'n':
-            print("[v] Exit program")
-            break
-        else:
-            print("Please Input y or n")
-            
-
-        
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description='SSH to a remote server and write/read the current time.')
-    parser.add_argument('hostIp', nargs='?', default='192.168.1.101', type=str, help='The IP address of the remote host (default: 192.168.1.100)')
+        try:
+            output = process.stdout.readline()
+            if output:
+                print(output.strip(), flush=True)  # flush=True로 강제 플러시
+                log_lines.append(output.strip())
+                last_line = output.strip()
+            if process.poll() is not None:
+                break
+        except UnicodeDecodeError:
+            print("result message include UnicodeDecodeError. Ignoring the line.")
     
-    args = parser.parse_args()
-    hostIp = args.hostIp
-    username = 'root'
-    main(hostIp, username)
+    # Ensure all remaining output is read
+    remaining_output = process.stdout.read()
+    if remaining_output:
+        for line in remaining_output.splitlines():
+            print(line.strip(), flush=True)
+            log_lines.append(line.strip())
+    
+    process.wait()  # Add this line
+    return process.returncode, log_lines
+
+#실시간 출력을 처리하는 함수
+def run_test_script_spi(script, args):
+    process = subprocess.run(f"{script} {args.strip()}", shell=True, capture_output=True, text=True,env=os.environ )  # strip args to remove trailing spaces
+    log_lines = []
+
+    try:
+        output = process.stdout.split('\n')  # split the output into lines
+        for line in output:
+            line = line.strip()  # strip line to remove trailing spaces
+            print(line, flush=True)  # flush=True로 강제 플러시
+            log_lines.append(line)
+    except UnicodeDecodeError:
+        print("result message include UnicodeDecodeError. Ignoring the line.")
+    return process.returncode, log_lines
+
+# 전역 변수 사용 최소화
+lock = multiprocessing.Lock()
+manager = multiprocessing.Manager()
+test_results = {}
+
+def get_test_args(item, config, default_config, valid_ranges):
+    if item not in config:
+        raise ValueError(f"Invalid test item: {item}")
+    
+    item_config = config.get(item, {})
+    default_item_config = default_config.get(item, {})
+    valid_item_ranges = valid_ranges.get(item, {})
+    
+    args = {}
+    
+    for key, default_value in default_item_config.items():
+
+        if key not in item_config or item_config[key] == None or item_config[key] == '':
+            value = default_value
+        else:
+            value = item_config[key]
+        
+        # valid_range 체크
+        valid_range = valid_item_ranges.get(key)
+        if valid_range is not None:
+            if isinstance(valid_range, range) and value not in valid_range:
+                raise ValueError(f"Invalid value for {item} {key}: {value}")
+            elif isinstance(valid_range, list) and value not in valid_range:
+                raise ValueError(f"Invalid value for {item} {key}: {value}")
+            elif isinstance(valid_range, type) and not isinstance(value, valid_range):
+                raise ValueError(f"Invalid type for {item} {key}: {value}")
+        
+        args[key] = value
+    return args
+
+def execute_test(item, script, verbose=True):
+    if config[item]['enable']:
+        test_name = item
+        repeat = config[item]['repeat']
+        
+        if verbose:
+            print(f"<TEST on {test_name}>", flush=True)
+        
+        test_results[test_name] = {}
+        
+        for i in range(repeat):
+            try:
+                args = get_test_args(item, config, default_config, valid_ranges)
+
+            except ValueError as e:
+                print(f"Error: {e}")
+                with lock:
+                    if repeat > 1:
+                        test_results[test_name][f'test_{i+1}'] = f"[{test_name}] FAIL (Invalid value)"
+                    else:   
+                        test_results[test_name] = f"[{test_name}] FAIL (Invalid value)"
+                return
+            
+            if item == 'UART':
+                args_str = f"{args['boadrate']} {args['data']}"
+            elif item == 'WIFI':
+                args_str = f"{args['ssid']} {args['min']} {args['max']} {args['password']} {args['address']}"
+            elif item == 'ETH':
+                args_str = f"{args['address']} {args['mac']}"
+            elif item == 'BLUETOOTH':
+                args_str = f"{args['mac']} {args['min']} {args['max']}"
+            elif item == 'VERSION':
+                args_str = f"\"{args['app']}\" {args['kernel']} {args['ram']} {args['serial']} {args['model']}"
+            elif item == 'LCD':
+                # LCD 테스트를 위한 인자 설정
+                auto_flag = config[item].get('auto', False)
+                args_str = f"--auto" if auto_flag else ""
+            elif item == 'PWM':
+                auto_flag = config[item].get('auto', False)
+                args_str = f"--auto" if auto_flag else ""
+            elif item == 'RTC':
+                auto_flag = config[item].get('auto', False)
+                args_str = f"--default-time" if auto_flag else ""
+            else:
+                args_str = ''
+            
+            script_path = os.path.abspath(f"/lg_rw/fct_test/{script}")
+            
+            # 디버깅을 위한 추가 코드
+            if not os.path.exists(script_path):
+                print(f"Error: The script {script_path} does not exist!")
+                return
+            if not os.access(script_path, os.R_OK):
+                print(f"Error: The script {script_path} is not readable!")
+                return
+            
+            result_code, log_lines = run_test_script(script_path, args_str)
+            last_line = log_lines[-1] if log_lines else "No output"
+            
+            with lock:
+                if repeat > 1:
+                    test_results[test_name][f'test_{i+1}'] = last_line
+                else:   
+                    test_results[test_name] = last_line
+            
+             # 진행률 출력
+            # progress = (i + 1) / repeat * 100
+            # print(f"Progress: {i + 1}/{repeat} tests completed ({progress:.2f}%)", flush=True)
+
+        else:
+            # If the loop completes without a break, record the last result
+            with lock:
+                if repeat > 1:
+                    test_results[test_name][f'test_{i+1}'] = last_line
+                else:   
+                    test_results[test_name] = last_line
+
+
+# 병렬 실행 여부 확인
+parallel = config.get('global', {}).get('parallel', False)
+
+
+# wifi와 ble 테스트가 최초로 실행되었는지 여부를 추적하는 플래그
+first_run_done = multiprocessing.Event()
+stop_event = multiprocessing.Event()
+
+def worker(item, script, first_run_done, stop_event):
+
+    if item in ['wifi', 'ble']:
+        if not first_run_done.is_set():
+            execute_test(item, script, False)
+            first_run_done.set()
+    else:
+        while not stop_event.is_set():
+            execute_test(item, script, False)
+            if stop_event.is_set():
+                break
+    #print(item, "worker done....")
+
+def input_listener(stop_event):
+    print("Press Enter to stop the tests...\n")
+    while True:
+        # select.select()을 사용하여 입력을 모니터링
+        if select.select([sys.stdin], [], [], 1)[0]:
+            print("...")
+            # Enter 키 입력을 감지
+            if sys.stdin.read(1) == '\n':
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+                print("@@@@@@@@@@ You want to exit... @@@@@@@@@@@@")
+                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+                stop_event.set()
+                
+                break
+
+
+def run_tests_in_parallel():
+
+    processes = []
+    for item, script in test_items.items():
+        if config[item]['enable']:
+            p = multiprocessing.Process(target=worker, args=(item, script[0], first_run_done, stop_event))
+            p.start()
+            processes.append(p)
+
+    input_listener(stop_event)
+
+    for p in processes:
+        p.join()
+
+
+def run_all_tests(scripts):
+    total_tests = sum(config[item]['repeat'] for item in config if config[item]['enable'])
+    completed_tests = 0
+
+    for item, script in scripts.items():
+        if config[item]['enable']:
+            execute_test(item, script[0])
+
+            # 진행률 업데이트
+            completed_tests += config[item]['repeat']
+            overall_progress = (completed_tests / total_tests) * 100
+            # 진행률 바 완료
+            print("----------------------------------------")
+
+    
+
+
+# 병렬 실행 시
+if parallel:
+    run_tests_in_parallel()
+    #print("done")
+
+# 순차 실행 시
+else:
+    # 순서를 설정
+    for item in test_items.keys():
+        if config[item]['enable']:
+            # 순서를 체크한다
+            if 'order' in config[item]:
+                test_items[item][1] = config[item]['order']
+    
+    # 정렬한다
+    test_items = dict(sorted(test_items.items(), key=lambda item: item[1][1]))
+
+    run_all_tests(test_items)
+# 테스트 결과 확인 및 출력
+all_tests_passed = True
+failed_count = 0
+total_count = 0
+print("-" * 40)
+print("Test Results:")
+print("=" * 40)
+print("Test       | Result    | Details")
+print("=" * 40)
+
+with open(log_file_path, 'a') as log_file:
+    for test_name, iterations in test_results.items():
+        if isinstance(iterations, dict):
+            for iteration, result in iterations.items():
+                total_count += 1
+
+                iteration_number = iteration.split('_')[1]  # 'test_1'에서 '1'만 추출
+                
+                if "OK" not in result:
+                    all_tests_passed = False
+                    failed_count += 1
+                    details = result.split("FAIL", 1)[-1].strip()  # "FAIL" 이후의 내용 추출
+                    details = details.strip("()")  # 양 옆의 괄호 제거
+                    print(f"{test_name:<6} {iteration_number:<4} | {'':<1} FAIL {'':<1} | {details}")
+                    log_file.write(f"{test_name:<6} {iteration_number:<4}| {'':<1} FAIL {'':<1} | {details}\n")
+                else:
+                    print(f"{test_name:<6} {iteration_number:<4} | {'':<2} OK {'':<2} |")
+                    log_file.write(f"{test_name:<6} {iteration_number:<4} | {'':<2} OK {'':<2} |\n")
+        else:
+            total_count += 1
+            if "OK" not in iterations:
+                all_tests_passed = False
+                failed_count += 1
+                details = iterations.split("FAIL", 1)[-1].strip()  # "FAIL" 이후의 내용 추출
+                details = details.strip("()")  # 양 옆의 괄호 제거
+                print(f"{test_name:<10} | {'':<1} FAIL {'':<1} | {details}")
+                log_file.write(f"{test_name:<10} | {'':<1} FAIL {'':<1} | {details}\n")
+            else:
+                print(f"{test_name:<10} | {'':<2} OK {'':<2} |")
+                log_file.write(f"{test_name:<10} | {'':<2} OK {'':<2} |\n")
+
+    print("-" * 40, flush=True)
+    if failed_count == total_count:
+        print(f"Total tests: {total_count}, All tests failed", flush=True)
+        log_file.write(f"Total tests: {total_count}, All tests failed\n")
+    else:
+        print(f"Total tests: {total_count}, Failed tests: {failed_count}", flush=True)
+        log_file.write(f"Total tests: {total_count}, Failed tests: {failed_count}\n")
+    print("-" * 40, flush=True)
+    log_file.write("-" * 40 + "\n")
+
+print("**********")
+# 전체 테스트 결과 출력
+with open(log_file_path, 'a') as log_file:
+    if all_tests_passed:
+        print("[ALL TESTS]: OK", flush=True)
+        log_file.write("[ALL TESTS]: OK\n")
+    else:
+        if failed_count == total_count:
+            print("[ALL TESTS]: FAIL (TOTAL)", flush=True)
+            log_file.write("[ALL TESTS]: FAIL (TOTAL)\n")
+        else:
+            print(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed", flush=True)
+            log_file.write(f"[ALL TESTS]: {failed_count} out of {total_count} tests failed\n")
+
+
+def find_usb_device():
+    for attempt in range(3):
+        try:
+            # /dev 디렉토리에서 FAT32, exFAT, vfat 파일 시스템을 가진 파티션을 찾음
+            lsblk_output = subprocess.run("lsblk -o NAME,FSTYPE", shell=True, capture_output=True, text=True).stdout.strip()
+            if lsblk_output:
+                lines = lsblk_output.splitlines()
+                for line in lines:
+                    parts = line.split()
+                    if len(parts) >= 2 and any(fs in parts[1] for fs in ['vfat', 'fat32', 'exfat']):
+                        device_name = parts[0].strip('`-')  # 디바이스 이름에서 `-` 문자를 제거
+                        return f"/dev/{device_name}"
+        except Exception as e:
+            print(f"Attempt {attempt + 1}: Failed to find USB device: {e}")
+    return None
+
+def is_mounted(device_name, mount_point):
+    try:
+        # mount 명령어를 사용하여 현재 마운트된 디바이스 목록을 확인
+        result = subprocess.run("mount", shell=True, capture_output=True, text=True).stdout.strip()
+        for line in result.splitlines():
+            if device_name in line and mount_point in line:
+                return True
+    except Exception as e:
+        print(f"Failed to check if device is mounted: {e}")
+    return False
+
+def mount_usb(device_name, mount_point):
+    for attempt in range(3):
+        try:
+            if not mount_point:
+                mount_point = "/lg_rw/fct_test/result"
+                os.makedirs(mount_point, exist_ok=True)
+            
+            # 디바이스가 이미 마운트되어 있는지 확인
+            if is_mounted(device_name, mount_point):
+                print(f"{device_name} is already mounted on {mount_point}")
+                return mount_point
+            
+            # 마운트 포인트가 존재하지 않으면 생성
+            if not os.path.exists(mount_point):
+                subprocess.run(f"mkdir -p {mount_point}", shell=True, check=True)
+            
+            # 디바이스 마운트
+            subprocess.run(f"mount {device_name} {mount_point}", shell=True, check=True)
+            return mount_point
+        except Exception as e:
+            print(f"Attempt {attempt + 1}: Failed to mount USB device: {e}")
+    return None
+
+def unmount_usb(mount_point):
+    for attempt in range(3):
+        try:
+            subprocess.run(f"umount {mount_point}", shell=True, check=True)
+            return True
+        except Exception as e:
+            print(f"Attempt {attempt + 1}: Failed to unmount USB device: {e}")
+    return False
+
+def compare_files(file1, file2):
+    try:
+        with open(file1, 'r') as f1, open(file2, 'r') as f2:
+            for line1, line2 in zip(f1, f2):
+                if line1 != line2:
+                    return False
+        return True
+    except Exception as e:
+        print(f"Failed to compare files: {e}")
+        return False
+
+def copy_log_file(src, dst):
+    for attempt in range(3):
+        try:
+            shutil.copy(src, dst)
+            print(f"Log file copied to USB: {dst}")
+            if compare_files(src, dst):
+                return True
+            else:
+                print(f"Verification failed for {dst}. Retrying...")
+        except Exception as e:
+            print(f"Attempt {attempt + 1}: Failed to copy log file to USB: {e}")
+    return False
+
+# USB 장치 찾기
+device_name = find_usb_device()
+
+if device_name:
+    # USB 장치 마운트
+    mount_point = mount_usb(device_name, "/lg_rw/fct_test/result")
+    if mount_point:
+        # 로그 파일 경로 생성
+        usb_full_log_path = os.path.join(mount_point, usb_log_file_path)
+
+        # 로그 파일을 USB로 복사 및 검증
+        if copy_log_file(log_file_path, usb_full_log_path):
+            # USB 장치 언마운트
+            if not unmount_usb(mount_point):
+                print("Failed to unmount USB device.")
+        else:
+            print("Failed to copy and verify log file to USB.")
+    else:
+        print("Failed to mount USB device")
+else:
+    print("USB device not found.")
