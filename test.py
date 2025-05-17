@@ -1,91 +1,114 @@
-==474079== 124 bytes in 1 blocks are definitely lost in loss record 281 of 350                                                                                   
-==474079==    at 0x487519C: malloc (vg_replace_malloc.c:381)                                                                                                     
-==474079==    by 0x4E94AD3: strdup (strdup.c:42)                                                                                                                 
-==474079==    by 0x11A36B: Create_PopUp_Open_Source_License (OpenSource.c:98)                                                                                    
-==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
-==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
-==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
-==474079==    by 0x11316F: EventStateMachineProc (App.c:1271)                                                                                                    
-==474079==    by 0x11316F: EventStateMachineProc (App.c:1188)                                                                                                    
+==474079== 128 bytes in 1 blocks are definitely lost in loss record 285 of 350                                                                                   
+==474079==    at 0x487A410: calloc (vg_replace_malloc.c:1328)                                                                                                    
+==474079==    by 0x119EB7: Create_PopUp_Input (NetworkInfoPage.c:399)                                                                                            
 ==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
 ==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
 ==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
 ==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
-==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)    
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
+==474079==    by 0x113647: EventStateMachineProc (App.c:1464)                                                                                                    
+==474079==    by 0x113647: EventStateMachineProc (App.c:1188)                                                                                                    
+==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
+==474079==                                                                                                                                                       
+==474079== 128 bytes in 1 blocks are definitely lost in loss record 286 of 350                                                                                   
+==474079==    at 0x487A410: calloc (vg_replace_malloc.c:1328)                                                                                                    
+==474079==    by 0x119EB7: Create_PopUp_Input (NetworkInfoPage.c:399)                                                                                            
+==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
+==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
+==474079==    by 0x113767: EventStateMachineProc (App.c:1519)                                                                                                    
+==474079==    by 0x113767: EventStateMachineProc (App.c:1188)                                                                                                    
+==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
+==474079==                                                                                                                                                       
+==474079== 128 bytes in 1 blocks are definitely lost in loss record 287 of 350                                                                                   
+==474079==    at 0x487A410: calloc (vg_replace_malloc.c:1328)                                                                                                    
+==474079==    by 0x119EB7: Create_PopUp_Input (NetworkInfoPage.c:399)                                                                                            
+==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
+==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)                                                                                     
+==474079==    by 0x1135F7: EventStateMachineProc (App.c:1416)                                                                                                    
+==474079==    by 0x1135F7: EventStateMachineProc (App.c:1188)                                                                                                    
+==474079==    by 0x497EBBF: lv_event_send (in /usr/lib/liblvgl.so.9.1.0)                                                                                         
+==474079==    by 0x49130A7: ??? (in /usr/lib/liblvgl.so.9.1.0)                                                                                                   
+==474079==    by 0x491317F: lv_obj_send_event (in /usr/lib/liblvgl.so.9.1.0)  
 
-void Create_PopUp_Open_Source_License() {
-    printf("Create_PopUp_Open_Source_License\n");
+void Create_PopUp_Input(POPUP_ID ePopupId)
+{
     lv_ui* ui = Ui_GetInstance();
 
-    CreatePopupWindow(POP_ID_OPEN_SOURCE_LICENSE);
+    CreatePopupWindow(ePopupId);
 
-    // 파일 열기
-    FILE* file = fopen("openSource.txt", "r");
-    if (!file) {
-        printf("Failed to open openSource.txt\n");
-        return; // 파일 열기 실패 시 함수 종료
-    } else {
-        printf("openSource.txt opened\n");
+	switch (ePopupId)
+	{
+		case POP_ID_NETWORK_INFO_SET_IP:
+			ui->mpPopupPage->mPopData.mushLblInformation_TR = TR_INPUT_IP;
+			break;
+		case POP_ID_NETWORK_INFO_SET_GW:
+			ui->mpPopupPage->mPopData.mushLblInformation_TR = TR_INPUT_GW;
+			break;
+		case POP_ID_NETWORK_INFO_SET_SM:
+			ui->mpPopupPage->mPopData.mushLblInformation_TR = TR_INPUT_SUBNET;
+			break;
+		// case POP_ID_NETWORK_INFO_SET_DNS:
+		// 	ui->mpPopupPage->mPopData.mushLblInformation_TR = TR_INPUT_DNS;
+		// 	break;
+		default:
+			printf("의도하지 않은 POPID\n");
+			break;
+	}
+ 
+    // 버튼 배열 할당 (0-9까지 10개 + 지움 버튼 1개 + 취소 + 다음)
+    ui->mpPopupPage->mPopData.BtnMatrixMap = calloc(17, sizeof(char*));
+    ui->mpPopupPage->mPopData.mucDynamicBtnCount = 16;
+
+    //버튼 배열 초기화
+    const char * kb_map[] = {
+        "1", "2", "3", "4", "5", LV_SYMBOL_BACKSPACE, "\n",
+         "6", "7", "8", "9", "0",LV_SYMBOL_NEW_LINE,"\n",
+        textData[TR_CANCEL], textData[TR_NEXT],""
+    };
+
+    // kb_map을 사용하여 버튼 배열 설정
+    for (int i = 0; i < sizeof(kb_map) / sizeof(kb_map[0]); i++) {
+        ui->mpPopupPage->mPopData.BtnMatrixMap[i] = calloc(strlen(kb_map[i]) + 1, sizeof(char));
+        strcpy(ui->mpPopupPage->mPopData.BtnMatrixMap[i], kb_map[i]);
     }
 
-    // 파일 크기 계산
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET); // 파일 포인터를 처음으로 되돌림
-    printf("File size: %ld bytes\n", file_size);
+    PopKeypadBtn(&ui->mpPopupPage->mPopData);
 
-    // 한 페이지에 표시할 최대 줄 수 계산
-    int max_lines_per_page = MAX_LINES_PER_PAGE;
-    printf("Max lines per page: %d\n", max_lines_per_page);
+	// 모든 입력 칸에 대해 이벤트 콜백 추가
+    lv_obj_add_event_cb(ui->mpPopupPage->mpBtnMatrix, EventPopUpProc, LV_EVENT_CLICKED, ui->mpPopupPage->mpTextBoxes);
 
-    // 텍스트를 읽어올 버퍼
-    char buffer[MAX_LINES_PER_PAGE * (MAX_CHARS_PER_LINE + 1)] = {0}; // 한 페이지에 표시할 최대 텍스트 크기
-    char line[MAX_CHARS_PER_LINE + 1] = {0}; // 한 줄을 읽어올 버퍼
-    int line_count = 0;
+    lv_btnmatrix_set_selected_btn(ui->mpPopupPage->mpBtnMatrix, 0);
 
-    // 파일에서 한 줄씩 읽기
-    while (fgets(line, sizeof(line), file)) {
-        // 줄바꿈 문자 제거
-        line[strcspn(line, "\n")] = '\0';
+	ui->mpPopupPage->mPopData.btn_status = (BtnStatus *)calloc(ui->mpPopupPage->mPopData.mucDynamicBtnCount, sizeof(BtnStatus));
 
-        // 버퍼에 줄 추가
-        strncat(buffer, line, sizeof(buffer) - strlen(buffer) - 1);
-        strncat(buffer, "\n", sizeof(buffer) - strlen(buffer) - 1);
 
-        line_count++;
-        if (line_count >= max_lines_per_page) {
-            break; // 한 화면에 표시할 줄 수를 초과하면 중단
-        }
-    }
+	for(uint32_t i = 0; i < ui->mpPopupPage->mPopData.mucDynamicBtnCount; i++)
+	{
+		ui->mpPopupPage->mPopData.btn_status[i].index = i;
+		ui->mpPopupPage->mPopData.btn_status[i].is_disabled = false;
+		
+	}
 
-    fclose(file);
-
-    printf("Buffer content:\n%s\n", buffer);
-
-    // OpenSource에 buffer 내용을 복사
-    ui->mpPopupPage->mPopData.OpenSource = strdup(buffer);
-
-    printf("ui->mpPopupPage->mPopData.OpenSource:\n%s\n", ui->mpPopupPage->mPopData.OpenSource);
-
-    // 총 페이지 수 계산
-    ui->mpPopupPage->mPopData.mucPageTotalCount = (file_size / (MAX_LINES_PER_PAGE * MAX_CHARS_PER_LINE)) + 
-                                                  ((file_size % (MAX_LINES_PER_PAGE * MAX_CHARS_PER_LINE)) > 0 ? 1 : 0);
-    printf("Total pages: %d\n", ui->mpPopupPage->mPopData.mucPageTotalCount);
-
-    ui->mpPopupPage->mPopData.BtnMatrixMap=calloc(4,sizeof(char*));
-	ui->mpPopupPage->mPopData.BtnMatrixMap[0]=calloc(strlen(textData[TR_PREV])+1,sizeof(char));
-	ui->mpPopupPage->mPopData.BtnMatrixMap[1]=calloc(strlen(textData[TR_CLOSE])+1,sizeof(char));
-    ui->mpPopupPage->mPopData.BtnMatrixMap[2]=calloc(strlen(textData[TR_NEXT_BUTTON])+1,sizeof(char));
-	ui->mpPopupPage->mPopData.BtnMatrixMap[3]=calloc(1,sizeof(char));
-
-	strcpy(ui->mpPopupPage->mPopData.BtnMatrixMap[0],textData[TR_PREV]);
-	strcpy(ui->mpPopupPage->mPopData.BtnMatrixMap[1],textData[TR_CLOSE]);
-    strcpy(ui->mpPopupPage->mPopData.BtnMatrixMap[2],textData[TR_NEXT_BUTTON]);
-	strcpy(ui->mpPopupPage->mPopData.BtnMatrixMap[3],"");
-
-    // 팝업 표시
-    PopOpensource(&ui->mpPopupPage->mPopData);
-    printf("PopOpensource OK\n");
-
-    lv_obj_add_event_cb(ui->mpPopupPage->mpBtnMatrix, EventPopUpProc, LV_EVENT_CLICKED, NULL);
+	// 두 번째 버튼 비활성화
+	lv_buttonmatrix_set_button_ctrl(ui->mpPopupPage->mpBtnMatrix, 5, LV_BUTTONMATRIX_CTRL_DISABLED);
+	ui->mpPopupPage->mPopData.btn_status[5].is_disabled = true;
+	// 두 번째 버튼 비활성화
+	lv_buttonmatrix_set_button_ctrl(ui->mpPopupPage->mpBtnMatrix, 11, LV_BUTTONMATRIX_CTRL_DISABLED);
+	ui->mpPopupPage->mPopData.btn_status[11].is_disabled = true;
+	// 두 번째 버튼 비활성화
+	lv_buttonmatrix_set_button_ctrl(ui->mpPopupPage->mpBtnMatrix, 13, LV_BUTTONMATRIX_CTRL_DISABLED);
+	ui->mpPopupPage->mPopData.btn_status[13].is_disabled = true;
 }
