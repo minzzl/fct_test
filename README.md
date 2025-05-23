@@ -1,3 +1,6 @@
+
+./configure --prefix=/home/user/work/newrootfs/rootfs --host=aarch64-linux-gnu
+make all
 user@user-VirtualBox:~/work/e2fsprogs-1.42.11$ sudo make install
 make[1]: Entering directory '/home/user/work/e2fsprogs-1.42.11'
 make[1]: 'util/subst.conf' is up to date.
@@ -212,20 +215,50 @@ make[1]: Nothing to be done for 'install-shlibs'.
 make[1]: Leaving directory '/home/user/work/e2fsprogs-1.42.11/intl'
 make[1]: Entering directory '/home/user/work/e2fsprogs-1.42.11/doc'
 	TEXI2DVI libext2fs.dvi
-You don't have a working TeX binary (tex) installed anywhere in
-your PATH, and texi2dvi cannot proceed without one.  If you want to use
-this script, you'll need to install TeX (if you don't have it) or change
-your PATH or TEX environment variable (if you do).  See the --help
-output for more details.
-
-For information about obtaining TeX, please see http://tug.org/texlive,
-or do a web search for TeX and your operating system or distro.
-
-On Debian you can install a working TeX system with
-  apt-get install texlive
-Makefile:331: recipe for target 'libext2fs.dvi' failed
-make[1]: [libext2fs.dvi] Error 1 (ignored)
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015/Debian) (preloaded format=etex)
+ restricted \write18 enabled.
+entering extended mode
+(././libext2fs.texinfo (/home/user/work/e2fsprogs-1.42.11/doc/texinfo.tex
+Loading texinfo [version 2006-02-13.16]: Basics, pdf, fonts, page headings,
+tables, conditionals, indexing, sectioning, toc, environments, defuns, macros,
+cross references, insertions,
+(/usr/share/texlive/texmf-dist/tex/generic/epsf/epsf.tex
+This is `epsf.tex' v2.7.4 <14 February 2011>
+) localization, and turning on texinfo input format.) [1] [2]
+(The EXT2FS Library) Chapter 1 [1] Chapter 2 [2] [3] [4] [5] [6] [7] [8]
+Underfull \hbox (badness 6252) in paragraph at lines 599--602
+ @textrm flag is not set @texttt ext2fs_get_next_inode[] @textrm will re-turn t
+he er-ror
+[9] [10] [11] [12] [13] [14] [15] [16] [17] (Concept Index) [18]
+(Function and Type Index) [19] [20]
+(/home/user/work/e2fsprogs-1.42.11/doc/libext2fs.toc [-1]) [-2] )
+(see the transcript file for additional information)
+Output written on libext2fs.dvi (24 pages, 75368 bytes).
+Transcript written on libext2fs.log.
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015/Debian) (preloaded format=etex)
+ restricted \write18 enabled.
+entering extended mode
+(././libext2fs.texinfo (/home/user/work/e2fsprogs-1.42.11/doc/texinfo.tex
+Loading texinfo [version 2006-02-13.16]: Basics, pdf, fonts, page headings,
+tables, conditionals, indexing, sectioning, toc, environments, defuns, macros,
+cross references, insertions,
+(/usr/share/texlive/texmf-dist/tex/generic/epsf/epsf.tex
+This is `epsf.tex' v2.7.4 <14 February 2011>
+) localization, and turning on texinfo input format.)
+(/home/user/work/e2fsprogs-1.42.11/doc/libext2fs.aux) [1] [2]
+(The EXT2FS Library) Chapter 1 [1] Chapter 2 [2] [3] [4] [5] [6] [7] [8]
+Underfull \hbox (badness 6252) in paragraph at lines 599--602
+ @textrm flag is not set @texttt ext2fs_get_next_inode[] @textrm will re-turn t
+he er-ror
+[9] [10] [11] [12] [13] [14] [15] [16] [17] (Concept Index) [18]
+(Function and Type Index) [19]
+(/home/user/work/e2fsprogs-1.42.11/doc/libext2fs.fns [20]) [21] [22]
+(/home/user/work/e2fsprogs-1.42.11/doc/libext2fs.toc [-1]) [-2] )
+(see the transcript file for additional information)
+Output written on libext2fs.dvi (26 pages, 102992 bytes).
+Transcript written on libext2fs.log.
 	MKINSTALLDIRS /home/user/work/newrootfs/rootfs/share/info
 	INSTALL_DATA /home/user/work/newrootfs/rootfs/share/info/libext2fs.info
 	GZIP /home/user/work/newrootfs/rootfs/share/info/libext2fs.info*
 make[1]: Leaving directory '/home/user/work/e2fsprogs-1.42.11/doc'
+if test ! -d e2fsck && test ! -d debugfs && test ! -d misc && test ! -d ext2ed ; then make install-libs ; fi
