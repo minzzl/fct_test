@@ -1,4 +1,9 @@
-	../../gcc/config/aarch64/aarch64-c.cc
+sudo fallocate -l 4G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+ 
+ ../../gcc/config/aarch64/aarch64-c.cc
 /usr/bin/g++ -std=gnu++11  -fno-PIE -c  -DIN_GCC_FRONTEND -O2 -I/home/user/work/buildroot-2024.02.1/output/host/include   -DIN_GCC  -DCROSS_DIRECTORY_STRUCTURE   -fno-exceptions -fno-rtti -fasynchronous-unwind-tables -W -Wall -Wno-narrowing -Wwrite-strings -Wcast-qual -Wmissing-format-attribute -Woverloaded-virtual -pedantic -Wno-long-long -Wno-variadic-macros -Wno-overlength-strings   -DHAVE_CONFIG_H -I. -I. -I../../gcc -I../../gcc/. -I../../gcc/../include -I../../gcc/../libcpp/include -I../../gcc/../libcody -I/home/user/work/buildroot-2024.02.1/output/host/include -I/home/user/work/buildroot-2024.02.1/output/host/include -I/home/user/work/buildroot-2024.02.1/output/host/include  -I../../gcc/../libdecnumber -I../../gcc/../libdecnumber/dpd -I../libdecnumber -I../../gcc/../libbacktrace   -o glibc-c.o -MT glibc-c.o -MMD -MP -MF ./.deps/glibc-c.TPo ../../gcc/config/glibc-c.cc
 virtual memory exhausted: Cannot allocate memory
 virtual memory exhausted: Cannot allocate memory
