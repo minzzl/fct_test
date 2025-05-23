@@ -1,4 +1,8 @@
+# 파티션이 마운트돼 있다면 먼저 해제
+sudo umount /dev/mmcblk0p2
 
+# /mnt/nfs/ext4g 이미지를 SD카드 2번 파티션에 기록
+sudo dd if=/mnt/nfs/ext4g of=/dev/mmcblk0p2 bs=4M conv=fsync status=progress
 # 1. 부트 아규먼트 갱신
 setenv bootargs 'console=ttyS0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait'
 
