@@ -152,17 +152,33 @@ def start_fct_test(ip,user,ask_cb,pwd="allnewb2b^^"):
        chan=c.get_transport().open_session(); chan.get_pty()
        chan.exec_command("python3 /lg_rw/fct_test/test_start_dq1.py")
        while True:
-           if chan.recv_ready():
-               out = chan.recv(1024).decode()
-               for line in out.splitlines(): log(line)
-               low=out.lower()
-               if "y/n" in low:
-                   ans=ask_cb("FCT","Enter y or n")
-                   chan.send(ans+"\n")
-               elif "input serial" in low:
-                   serial=ask_cb("Serial","Input serial :")
-                   chan.send(serial+"\n")
-           if chan.exit_status_ready(): break
+            if chan.recv_ready():
+                raw = chan.recv(4096)                       # 바이트 충분히
+                out = raw.decode("utf-8", errors="replace") # 한글 깨짐 방지
+
+                for line in out.splitlines():
+                    log(line)                               # 로그창에 그대로 출력
+
+                    # ─── [Q] 프롬프트 처리 ─────────────────────────
+                    if "[Q]" in line:
+                        # "[Q]" 문자열만 제거하고 앞뒤 공백은 정리
+                        prompt = line.replace("[Q]", "", 1).strip()
+                        answer = ask_cb("FCT", prompt)      # 사용자 입력 받기
+                        chan.send((answer or "") + "\n")    # 그대로 전송
+                        continue
+
+                    # ─── 기타 y/n, serial 입력 처리(원형 유지) ───
+                    if "y/n" in line.lower():
+                        ans = ask_cb("FCT", line.strip())
+                        chan.send((ans or "") + "\n")
+                    elif "input serial" in line.lower():
+                        serial = ask_cb("Serial", "Input serial :")
+                        chan.send((serial or "") + "\n")
+
+            if chan.exit_status_ready():
+                break
+
+
        status=chan.recv_exit_status(); chan.close(); c.close()
        if status==0: log("[v] FCT done"); return True
        log(f"[x] FCT fail ({status})"); return False
