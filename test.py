@@ -157,7 +157,7 @@ def start_fct_test(ip,user,ask_cb,pwd="allnewb2b^^"):
                for line in out.splitlines(): log(line)
                low=out.lower()
                if "y/n" in low:
-                   ans=ask_cb(low)
+                   ans=ask_cb("FCT","Enter y or n")
                    chan.send(ans+"\n")
                elif "input serial" in low:
                    serial=ask_cb("Serial","Input serial :")
