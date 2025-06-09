@@ -1,30 +1,19 @@
-# ────────── 변경된 질문 처리 포함 ─────────────────────
-def start_fct_test(ip,user,ask_cb,pwd="allnewb2b^^"):
-    log("[...] Start FCT")
-    try:
-        c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        c.connect(hostname=ip, username=user, password=pwd, timeout=10)
-        chan=c.get_transport().open_session(); chan.get_pty()
-        chan.exec_command("python3 /lg_rw/fct_test/test_start_dq1.py")
-
-        while True:
-            if chan.recv_ready():
-                out = chan.recv(4096).decode("utf-8", errors="replace")
-                for line in out.splitlines():
-                    log(line)
-                    if line.startswith("[Q]"):
-                        txt = line.replace("[Q]", "", 1).strip()
-                        if "(y/n" in txt.lower():
-                            ans = ask_choice(txt)
-                        else:
-                            ans = ask_input("FCT", txt)
-                        chan.send((ans or "") + "\n"); continue
-            if chan.exit_status_ready(): break
-
-        status=chan.recv_exit_status(); chan.close(); c.close()
-        if status==0: log("[v] FCT done"); return True
-        log(f"[x] FCT fail ({status})"); return False
-    except Exception as e:
-        log(f"[x] FCT err: {e}"); return False
-
-# ────────── FCT 핵심 흐름 / GUI 구성 (원본
+# ────────── (y/n(/r)) 버튼 다이얼로그 ────────────────
+def ask_choice(prompt: str) -> str:
+    """(y/n) 또는 (y/n/r) 프롬프트를 버튼으로 처리, 반환 'y'|'n'|'r'."""
+    result = tk.StringVar()
+    def _ask():
+        win = tk.Toplevel(root); win.title("FCT")
+        win.geometry("+{}+{}".format(root.winfo_rootx()+250, root.winfo_rooty()+200))
+        win.resizable(False, False); win.attributes("-topmost", True)
+        ttk.Label(win, text=prompt, wraplength=320).pack(padx=25, pady=18)
+        frm = ttk.Frame(win); frm.pack(pady=(0,18))
+        def done(val): result.set(val); win.destroy()
+        ttk.Button(frm, text="확인",  width=9, command=lambda: done('y')).pack(side="left", padx=6)
+        ttk.Button(frm, text="취소",  width=9, command=lambda: done('n')).pack(side="left", padx=6)
+        if ' r' in prompt.lower():
+            ttk.Button(frm, text="다시", width=9, command=lambda: done('r')).pack(side="left", padx=6)
+        win.grab_set(); win.protocol("WM_DELETE_WINDOW", lambda: done('n'))
+    root.after(0, _ask)
+    root.wait_variable(result)
+    return result.get()
