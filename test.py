@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # lg_fct_gui.py  ―  ACP-i FCT Tool (LG 테마 GUI)
-import os, sys, time, queue, threading, warnings, subprocess, pathlib
+import os, sys, time, queue, threading, warnings, subprocess, pathlib          # pathlib 추가
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk, scrolledtext, simpledialog, messagebox
@@ -8,7 +8,6 @@ from datetime import datetime
 import pandas as pd
 import yaml
 import paramiko
-
 # ────────── 실행 위치(스크립트 vs 패키징 exe) ──────────
 BASE_DIR = pathlib.Path(sys.executable).parent if getattr(sys, 'frozen', False) \
            else pathlib.Path(__file__).resolve().parent
@@ -40,24 +39,34 @@ def ask_choice(prompt: str) -> str:
         ttk.Label(win, text=prompt, wraplength=320).pack(padx=25, pady=18)
         frm = ttk.Frame(win); frm.pack(pady=(0,18))
         def done(val): result.set(val); win.destroy()
-        ttk.Button(frm, text="확인", width=9, command=lambda: done('y')).pack(side="left", padx=6)
-        ttk.Button(frm, text="취소", width=9, command=lambda: done('n')).pack(side="left", padx=6)
+        
         if ' r' in prompt.lower():
+            ttk.Button(frm, text="성공", width=9, command=lambda: done('y')).pack(side="left", padx=6)
+            ttk.Button(frm, text="실패", width=9, command=lambda: done('n')).pack(side="left", padx=6)
             ttk.Button(frm, text="다시", width=9, command=lambda: done('r')).pack(side="left", padx=6)
+        else:
+            ttk.Button(frm, text="확인", width=9, command=lambda: done('y')).pack(side="left", padx=6)
+            ttk.Button(frm, text="취소", width=9, command=lambda: done('n')).pack(side="left", padx=6)
         win.update_idletasks()          # ★ 빈 창 방지
         win.wait_visibility(win)        # ★
+
+        # ─── 중앙 정렬 ───
+        w, h = win.winfo_width(), win.winfo_height()
+        rx, ry = root.winfo_rootx(), root.winfo_rooty()
+        rw, rh = root.winfo_width(), root.winfo_height()
+        x = rx + (rw - w)//2
+        y = ry + (rh - h)//2
+        win.geometry(f"+{x}+{y}")
+
         win.grab_set()
         win.protocol("WM_DELETE_WINDOW", lambda: done('n'))
     root.after(0, _ask)
     root.wait_variable(result)
     return result.get()
-
-# ────────── 파일 상수 ────────────────────────────────
-EXCEL_FILE   = BASE_DIR / "local_file.xlsx"
-CFG_TEMPLATE = BASE_DIR / "new_cfg.yml"
+EXCEL_FILE   = BASE_DIR / "local_file.xlsx"   # 수정
+CFG_TEMPLATE = BASE_DIR / "new_cfg.yml"       # 신규
 current_row_index = 0
-
-# ────────── 유틸 함수들 ─────────────────────────────
+# ────────── 유틸 함수들 ───────────────────────────────
 def remove_known_host(path, ip):
     if os.path.exists(path):
         with open(path) as f:
