@@ -1,3 +1,8 @@
-[x] Excel error: Missing optional dependency 'openpyxl'.  Use pip or conda to install openpyxl.
+올해 저는 업무적으로는 ACPi, Thinq client 개발 완료를, 자기계발 측면으로는 토스 level7, dx2 을 주요 목표로 설정했습니다.
 
+실제 신규 플랫폼인 ACPi 를 개발하며 제어기에 대한 전반적인 이해도를 높였고, 
+파트 내 세미나와 팀 내 세미나를 통해 프로젝트 미참여 인원들에게 플랫폼에 대한 이해도를 높일 수 있도록 했습니다.
+
+한편 자기계발 측면에서는 토스 level 7 을 획득하였으며, dx2 는 과제 완료 보고서 제출을 남겨두고 있습니다.
+추가적으로 GB 취득을 위해 수업을 수강하였으며, HVAC 취득을 위해  시험을 응시했지만 아쉽게 level 취득은 못하였습니다. 이에 남은 기간 동안 취득을 완료할 예정입니다.
  
