@@ -1,13 +1,4 @@
-root@0e12f649691a:~/lgsi-homelauncher# flutter upgrade
-
-
-
-Unable to upgrade Flutter: Your Flutter checkout is currently not on a release branch.
-Use "flutter channel" to switch to an official channel, and retry. Alternatively, re-install Flutter by going to https://flutter.dev/docs/get-started/install.
-root@0e12f649691a:~/lgsi-homelauncher# 
-root@0e12f649691a:~/lgsi-homelauncher# 
-root@0e12f649691a:~/lgsi-homelauncher# 
-root@0e12f649691a:~/lgsi-homelauncher# flutter channel
-Flutter channels:
-
-Currently not on an official channel.
+root@0e12f649691a:~/lgsi-homelauncher# flutter channel stable
+Switching to flutter channel 'stable'...
+git: fatal: 'origin/stable' is not a commit and a branch 'stable' cannot be created from it
+Switching channels failed with error code 128
