@@ -1,44 +1,104 @@
-좋은 질문이에요! 방금 실행하신 명령어:
+root@0e12f649691a:~/acpi-launcher# flutter run -d linux
+Launching lib/main.dart on Linux in debug mode...
+Building Linux application...                                           
+✓ Built build/linux/x64/debug/bundle/acpi_launcher
 
-ps aux | grep gnome-keyring
+(acpi_launcher:170148): dbind-WARNING **: 06:14:26.868: Couldn't connect to accessibility bus: Failed to connect to socket /run/user/1000/at-spi/bus: No such file or directory
+Gtk-Message: 06:14:26.884: Failed to load module "canberra-gtk-module"
+Gtk-Message: 06:14:26.886: Failed to load module "canberra-gtk-module"
 
-결과:
+(acpi_launcher:170148): Atk-CRITICAL **: 06:14:26.906: atk_socket_embed: assertion 'plug_id != NULL' failed
+libGL error: glx: failed to create dri3 screen
+libGL error: failed to load driver: nouveau
+Proxy server (Socket based) started on http://localhost:45113
+ApiConstants.baseUrl: http://localhost:45113/?url=/api/v1
+[🌎 Easy Localization] [DEBUG] Localization initialized
+[🌎 Easy Localization] [DEBUG] Start
+[🌎 Easy Localization] [DEBUG] Init state
+[🌎 Easy Localization] [DEBUG] Build
+[🌎 Easy Localization] [DEBUG] Init Localization Delegate
+[🌎 Easy Localization] [DEBUG] Init provider
+[🌎 Easy Localization] [DEBUG] Load Localization Delegate
+[🌎 Easy Localization] [DEBUG] Load asset from assets/translations
+Syncing files to device Linux...                                   139ms
 
-root 167831 0.0 0.0 6480 2288 pts/2 S+ 06:11 0:00 grep --color=auto gnome-keyring
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
 
-이건 grep 명령어 자체만 실행 중이라는 뜻입니다.
-즉, gnome-keyring 프로세스 자체는 실행되고 있지 않다는 뜻이에요.
+A Dart VM Service on Linux is available at: http://127.0.0.1:35147/neoM2rRgSK8=/
+The Flutter DevTools debugger and profiler on Linux is available at: http://127.0.0.1:9100?uri=http://127.0.0.1:35147/neoM2rRgSK8=/
 
-⸻
+** (acpi_launcher:170148): WARNING **: 06:14:27.758: libsecret_error: Failed to unlock the keyring
+[ERROR:flutter/runtime/dart_vm_initializer.cc(40)] Unhandled Exception: PlatformException(Libsecret error, Failed to unlock the keyring, null, null)
+#0      StandardMethodCodec.decodeEnvelope (package:flutter/src/services/message_codecs.dart:652:7)
+#1      MethodChannel._invokeMethod (package:flutter/src/services/platform_channel.dart:370:18)
+<asynchronous suspension>
+#2      _SignInScreenState._loadSavedIp (package:acpi_launcher/screens/accounts/sign_in_screen.dart:56:16)
+<asynchronous suspension>
+#3      _SignInScreenState.initState.<anonymous closure> (package:acpi_launcher/screens/accounts/sign_in_screen.dart:41:25)
+<asynchronous suspension>
 
-🎯 확인된 사항
-	•	gnome-keyring-daemon 프로세스가 없어 → keyring 동작 안 하고 있음
-	•	그래서 libsecret을 사용하는 flutter_secure_storage 등이 실패
+*** Request ***
+uri: http://localhost:45113/?url=/api/v1/admin
+method: GET
+responseType: ResponseType.json
+followRedirects: true
+persistentConnection: true
+connectTimeout: null
+sendTimeout: null
+receiveTimeout: null
+receiveDataWhenStatusError: true
+extra: {}
+headers:
+data:
+null
 
-⸻
+[Proxy UriDebug] Input urlParam: /api/v1/admin
+[Proxy UriDebug] API call. Resolved URI with original port: https://10.175.195.66:9300/api/v1/admin for path: /api/v1/admin
+[Proxy Auth] Request to: /api/v1/admin, Method: GET, isApiCall: true, requiresAuth (rule based): true, final requiresAuthHeader: true
 
-🔧 다음 단계
+** (acpi_launcher:170148): WARNING **: 06:14:33.749: libsecret_error: Failed to unlock the keyring
+Error in _forwardHttpRequestWithSocket for https://10.175.195.66:9300/api/v1/admin: PlatformException(Libsecret error, Failed to unlock the keyring, null, null)
+#0      StandardMethodCodec.decodeEnvelope (package:flutter/src/services/message_codecs.dart:652:7)
+#1      MethodChannel._invokeMethod (package:flutter/src/services/platform_channel.dart:370:18)
+<asynchronous suspension>
+#2      AccountsManageRepository.getValidAccessToken (package:acpi_launcher/repos/accounts/accounts_manage_repository.dart:50:27)
+<asynchronous suspension>
+#3      _forwardHttpRequestWithSocketAuthAndRetry (package:acpi_launcher/network/proxy_server.dart:294:37)
+<asynchronous suspension>
+#4      _proxyHandler (package:acpi_launcher/network/proxy_server.dart:112:28)
+<asynchronous suspension>
+#5      logRequests.<anonymous closure>.<anonymous closure>.<anonymous closure> (package:shelf/src/middleware/logger.dart:30:62)
+<asynchronous suspension>
+#6      handleRequest (package:shelf/shelf_io.dart:140:16)
+<asynchronous suspension>
 
-다음 명령어로 keyring 데몬을 수동 실행해보세요:
+Proxy: 2025-07-04T06:14:33.616046  0:00:00.143756 GET     [503] /?url=/api/v1/admin
+*** DioException ***:
+uri: http://localhost:45113/?url=/api/v1/admin
+DioException [bad response]: This exception was thrown because the response has a status code of 503 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 503 has the following meaning: "Server error - the server failed to fulfil an apparently valid request"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
 
-eval $(gnome-keyring-daemon --start)
+uri: http://localhost:45113/?url=/api/v1/admin
+statusCode: 503
+headers:
+ x-powered-by: Dart with package:shelf
+ date: Fri, 04 Jul 2025 06:14:33 GMT
+ access-control-allow-origin: *
+ content-length: 116
+ x-frame-options: SAMEORIGIN
+ content-type: text/plain; charset=utf-8
+ x-xss-protection: 1; mode=block
+ x-content-type-options: nosniff
+Response Text:
+Proxy to origin server failed (Socket): PlatformException(Libsecret error, Failed to unlock the keyring, null, null)
 
-실행 후 다시 확인:
 
-ps aux | grep gnome-keyring
-
-정상적으로 실행되면 다음처럼 출력될 거예요:
-
-your_user   168888  0.0  ... gnome-keyring-daemon --start ...
-
-
-⸻
-
-📝 만약 gnome-keyring-daemon 명령도 없다면 다음 먼저 설치:
-
-sudo apt update
-sudo apt install gnome-keyring
-
-설치 후 다시 실행하면 됩니다.
-
-필요하면 자동 실행 설정이나 대체 방법 (flutter_secure_storage 우회) 도 도와드릴게요.
+checkAdmin Exception: Instance of 'CustomException'
