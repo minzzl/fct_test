@@ -1,45 +1,24 @@
-딱! 한 가지만 하면 드디어 GUI 앱 실행됩니다 🎉
+root@0e12f649691a:~/lgsi-homelauncher# flutter doctor
+Doctor summary (to see all details, run flutter doctor -v):
+[✓] Flutter (Channel stable, 3.32.5, on Ubuntu 22.04.1 LTS 6.11.0-29-generic, locale en_US.UTF-8)
+[✓] Android toolchain - develop for Android devices (Android SDK version 33.0.1)
+[✗] Chrome - develop for the web (Cannot find Chrome executable at google-chrome)
+    ! Cannot find Chrome. Try setting CHROME_EXECUTABLE to a Chrome executable.
+[✓] Linux toolchain - develop for Linux desktop
+[!] Android Studio (not installed)
+[✓] Connected device (1 available)
+[✓] Network resources
 
-⸻
-
-❗ 현재 상태: CMake 미설치
-
-Flutter는 리눅스 앱 빌드시 CMake를 반드시 사용합니다.
-
-⸻
-
-✅ 해결 방법: 한 줄로 CMake 설치
-
-apt update && apt install -y cmake
-
-
-⸻
-
-💡 추가 추천 패키지 (Flutter Linux 앱 빌드용)
-
-apt install -y clang ninja-build pkg-config libgtk-3-dev liblzma-dev mesa-utils
-
-이걸 다 설치해두면 이후 flutter doctor 경고도 대부분 사라지고, 실행 안정성도 올라가요.
-
-⸻
-
-✅ 설치 후 마무리
-	1.	다시 확인:
-
-flutter doctor
-
-	2.	그리고 실행:
-
-flutter run -d linux
+! Doctor found issues in 2 categories.
+root@0e12f649691a:~/lgsi-homelauncher# flutter run -d linux
+Launching lib/main.dart on Linux in debug mode...
+CMake Error at /usr/share/cmake-3.22/Modules/FindPkgConfig.cmake:603 (message):
+  A required package was not found
+Call Stack (most recent call first):
+  /usr/share/cmake-3.22/Modules/FindPkgConfig.cmake:825 (_pkg_check_modules_internal)
+  flutter/ephemeral/.plugin_symlinks/flutter_secure_storage_linux/linux/CMakeLists.txt:15 (pkg_check_modules)
 
 
-⸻
-
-🟢 기대 결과
-	•	cmake 설치 후 flutter run -d linux 하면
-	•	당신의 호스트 화면에 Flutter GUI 앱이 뜹니다! 🎯
-
-⸻
-
-지금 바로 apt install cmake 실행하고 다시 flutter run -d linux 해보세요.
-되면 진짜 최종 성공입니다 – 같이 확인해드릴게요!
+Building Linux application...                                           
+Error: Unable to generate build files
+root@0e12f649691a:~/lgsi-homelauncher# 
