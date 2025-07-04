@@ -1,4 +1,17 @@
-minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ docker run -it --name flutter-dev -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -v $HOME/flutter-dev:/home/flutter cirrusci/flutter:latest bash
-docker: Error response from daemon: Conflict. The container name "/flutter-dev" is already in use by container "2670f4bdf909e573b46c35e06f75329698494e2ab1993f2b8bb6609a95859c9c". You have to remove (or rename) that container to be able to reuse that name.
-See 'docker run --help'.
-minzzl@minzzl-HP-Z6-G5-Wo
+root@0e12f649691a:~/lgsi-homelauncher# flutter run -d linux
+Downloading linux-x64/linux-x64-flutter-gtk tools...                7.4s
+Downloading linux-x64-profile/linux-x64-flutter-gtk tools...         3.3s
+Downloading linux-x64-release/linux-x64-flutter-gtk tools...         5.2s
+Running "flutter pub get" in lgsi-homelauncher...
+Resolving dependencies... 
+The current Dart SDK version is 2.19.4.
+
+Because acpi_launcher requires SDK version >=3.3.3 <4.0.0, version solving failed.
+pub get failed
+command: "/sdks/flutter/bin/cache/dart-sdk/bin/dart __deprecated_pub --color --directory . get --example"
+pub env: {
+  "FLUTTER_ROOT": "/sdks/flutter",
+  "PUB_ENVIRONMENT": "flutter_bot:flutter_cli:verify:run",
+  "PUB_CACHE": "/root/.pub-cache",
+}
+exit code: 1
