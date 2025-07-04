@@ -15,6 +15,3 @@ Doctor summary (to see all details, run flutter doctor -v):
 [!] Android Studio (not installed)
 [✓] Connected device (1 available)
 [✓] HTTP Host Availability
-
-! Doctor found issues in 4 categories.
-root@0e12f649691a:/opt# 
