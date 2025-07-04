@@ -1,104 +1,70 @@
-root@0e12f649691a:~/acpi-launcher# flutter run -d linux
-Launching lib/main.dart on Linux in debug mode...
-Building Linux application...                                           
-✓ Built build/linux/x64/debug/bundle/acpi_launcher
+오류의 핵심은 아래 두 가지입니다:
 
-(acpi_launcher:164129): dbind-WARNING **: 06:04:39.940: Couldn't connect to accessibility bus: Failed to connect to socket /run/user/1000/at-spi/bus: No such file or directory
-Gtk-Message: 06:04:39.958: Failed to load module "canberra-gtk-module"
-Gtk-Message: 06:04:39.959: Failed to load module "canberra-gtk-module"
+⸻
 
-(acpi_launcher:164129): Atk-CRITICAL **: 06:04:39.975: atk_socket_embed: assertion 'plug_id != NULL' failed
-libGL error: glx: failed to create dri3 screen
-libGL error: failed to load driver: nouveau
-Proxy server (Socket based) started on http://localhost:41309
-ApiConstants.baseUrl: http://localhost:41309/?url=/api/v1
-[🌎 Easy Localization] [DEBUG] Localization initialized
-[🌎 Easy Localization] [DEBUG] Start
-[🌎 Easy Localization] [DEBUG] Init state
-[🌎 Easy Localization] [DEBUG] Build
-[🌎 Easy Localization] [DEBUG] Init Localization Delegate
-[🌎 Easy Localization] [DEBUG] Init provider
-[🌎 Easy Localization] [DEBUG] Load Localization Delegate
-[🌎 Easy Localization] [DEBUG] Load asset from assets/translations
-Syncing files to device Linux...                                   190ms
+🔐 1. Keyring 관련 오류 (libsecret_error: Failed to unlock the keyring)
+	•	PlatformException(Libsecret error, Failed to unlock the keyring) 에서 발생.
+	•	libsecret은 Linux 환경에서 로그인 정보 등 민감 데이터를 저장하는 Gnome Keyring(또는 Secret Service)을 사용하는데, 현재 Keyring 잠금을 해제하지 못해 로그인 정보를 읽지 못하고 있습니다.
 
-Flutter run key commands.
-r Hot reload. 🔥🔥🔥
-R Hot restart.
-h List all available interactive commands.
-d Detach (terminate "flutter run" but leave application running).
-c Clear the screen
-q Quit (terminate the application on the device).
+해결 방법:
+	1.	Keyring 데몬이 실행 중인지 확인
 
-A Dart VM Service on Linux is available at: http://127.0.0.1:45875/7jAZvTvnRtg=/
-The Flutter DevTools debugger and profiler on Linux is available at: http://127.0.0.1:9100?uri=http://127.0.0.1:45875/7jAZvTvnRtg=/
-
-** (acpi_launcher:164129): WARNING **: 06:04:40.868: libsecret_error: Failed to unlock the keyring
-[ERROR:flutter/runtime/dart_vm_initializer.cc(40)] Unhandled Exception: PlatformException(Libsecret error, Failed to unlock the keyring, null, null)
-#0      StandardMethodCodec.decodeEnvelope (package:flutter/src/services/message_codecs.dart:652:7)
-#1      MethodChannel._invokeMethod (package:flutter/src/services/platform_channel.dart:370:18)
-<asynchronous suspension>
-#2      _SignInScreenState._loadSavedIp (package:acpi_launcher/screens/accounts/sign_in_screen.dart:56:16)
-<asynchronous suspension>
-#3      _SignInScreenState.initState.<anonymous closure> (package:acpi_launcher/screens/accounts/sign_in_screen.dart:41:25)
-<asynchronous suspension>
-
-*** Request ***
-uri: http://localhost:41309/?url=/api/v1/admin
-method: GET
-responseType: ResponseType.json
-followRedirects: true
-persistentConnection: true
-connectTimeout: null
-sendTimeout: null
-receiveTimeout: null
-receiveDataWhenStatusError: true
-extra: {}
-headers:
-data:
-null
-
-[Proxy UriDebug] Input urlParam: /api/v1/admin
-[Proxy UriDebug] API call. Resolved URI with original port: https://10.175.195.66:9300/api/v1/admin for path: /api/v1/admin
-[Proxy Auth] Request to: /api/v1/admin, Method: GET, isApiCall: true, requiresAuth (rule based): true, final requiresAuthHeader: true
-
-** (acpi_launcher:164129): WARNING **: 06:05:05.429: libsecret_error: Failed to unlock the keyring
-Error in _forwardHttpRequestWithSocket for https://10.175.195.66:9300/api/v1/admin: PlatformException(Libsecret error, Failed to unlock the keyring, null, null)
-#0      StandardMethodCodec.decodeEnvelope (package:flutter/src/services/message_codecs.dart:652:7)
-#1      MethodChannel._invokeMethod (package:flutter/src/services/platform_channel.dart:370:18)
-<asynchronous suspension>
-#2      AccountsManageRepository.getValidAccessToken (package:acpi_launcher/repos/accounts/accounts_manage_repository.dart:50:27)
-<asynchronous suspension>
-#3      _forwardHttpRequestWithSocketAuthAndRetry (package:acpi_launcher/network/proxy_server.dart:294:37)
-<asynchronous suspension>
-#4      _proxyHandler (package:acpi_launcher/network/proxy_server.dart:112:28)
-<asynchronous suspension>
-#5      logRequests.<anonymous closure>.<anonymous closure>.<anonymous closure> (package:shelf/src/middleware/logger.dart:30:62)
-<asynchronous suspension>
-#6      handleRequest (package:shelf/shelf_io.dart:140:16)
-<asynchronous suspension>
-
-Proxy: 2025-07-04T06:05:05.321913  0:00:00.123614 GET     [503] /?url=/api/v1/admin
-*** DioException ***:
-uri: http://localhost:41309/?url=/api/v1/admin
-DioException [bad response]: This exception was thrown because the response has a status code of 503 and RequestOptions.validateStatus was configured to throw for this status code.
-The status code of 503 has the following meaning: "Server error - the server failed to fulfil an apparently valid request"
-Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
-
-uri: http://localhost:41309/?url=/api/v1/admin
-statusCode: 503
-headers:
- x-powered-by: Dart with package:shelf
- date: Fri, 04 Jul 2025 06:05:05 GMT
- access-control-allow-origin: *
- content-length: 116
- x-frame-options: SAMEORIGIN
- content-type: text/plain; charset=utf-8
- x-xss-protection: 1; mode=block
- x-content-type-options: nosniff
-Response Text:
-Proxy to origin server failed (Socket): PlatformException(Libsecret error, Failed to unlock the keyring, null, null)
+ps aux | grep gnome-keyring
 
 
-checkAdmin Exception: Instance of 'CustomException'
+	2.	Keyring unlock 처리
+수동 unlock:
+
+secret-tool store --label='test' my test
+
+혹은 앱에서 자동 로그인 시도 전에 unlock 로직 필요.
+
+	3.	해결 우회
+테스트 용도라면 환경 변수로 저장된 패스워드 사용도 가능 (보안상 권장X):
+
+String? ip = Platform.environment['ACPI_IP'];
+
+
+
+⸻
+
+🧩 2. 503 에러 및 DioException
+	•	https://10.175.195.66:9300/api/v1/admin 요청이 실패하면서 503 발생
+	•	내부적으로는 keyring unlock 실패 → accessToken 획득 실패 → 인증 헤더 없이 API 요청 → 인증 필요 API 503 반환 흐름입니다.
+
+해결 방법:
+	1.	Keyring unlock 문제 해결 후 재시도
+위 문제를 해결하면 이 문제도 같이 해결될 가능성 높음.
+	2.	임시 accessToken 하드코딩 테스트 (비추천)
+인증 절차 우회하여 서버 응답을 확인하려면:
+
+headers: {
+  'Authorization': 'Bearer <테스트용 토큰>',
+}
+
+
+
+⸻
+
+✨ 보너스: GTK 오류
+	•	Gtk-Message: Failed to load module "canberra-gtk-module"
+이는 UI 사운드 관련 모듈이 없다는 경고로, 기능엔 지장 없음
+필요 시 다음으로 설치 가능:
+
+sudo apt-get install libcanberra-gtk-module libcanberra-gtk3-module
+
+
+
+⸻
+
+✅ 요약
+
+문제	설명	조치
+libsecret_error	Keyring 잠금 해제 실패로 로그인 정보 불러오기 실패	Gnome Keyring 데몬 실행 확인 및 unlock
+503 /api/v1/admin	인증 토큰 누락 또는 유효하지 않음	Keyring 문제 해결 후 재시도
+GTK 모듈 경고	UI 사운드 모듈 없음	무시 가능 or apt install로 설치
+
+
+⸻
+
+필요하면 keyring을 사용하지 않고 단순 로컬 저장이나 .env 파일을 활용하는 구조로 바꾸는 것도 가능해요. 필요하면 그렇게 수정하는 방향도 도와줄게요.
