@@ -1,3 +1,19 @@
+
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ docker run -it --name flutter-dev -v $HOME/flutter-dev:/home/flutter -p 8080:8080 cirrusci/flutter:latest bash
+
+Unable to find image 'cirrusci/flutter:latest' locally
+latest: Pulling from cirrusci/flutter
+677076032cca: Pull complete 
+8922847ad711: Pull complete 
+4f4fb700ef54: Pull complete 
+22c2ad27dbb4: Pull complete 
+08416cb70613: Pull complete 
+551def77e893: Pull complete 
+Digest: sha256:d99b1ba2602240a74722970b5c0cd704bbe60a7eba7557157c784f2f693c393f
+Status: Downloaded newer image for cirrusci/flutter:latest
+root@2670f4bdf909:/# 
+
+
 맞아요! Flutter는 GUI 앱을 만드는 프레임워크니까, 당연히 빌드 후 실행하면 GUI 창이 뜨는 게 정상이에요.
 근데 핵심은:
 
