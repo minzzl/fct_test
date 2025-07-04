@@ -1,93 +1,20 @@
-root@0e12f649691a:~/lgsi-homelauncher# flutter run 
-Running "flutter pub get" in lgsi-homelauncher...
-Resolving dependencies... 
-The current Dart SDK version is 2.19.4.
+root@0e12f649691a:/opt# flutter doctor
+Doctor summary (to see all details, run flutter doctor -v):
+[!] Flutter (Channel unknown, 3.7.7, on Ubuntu 22.04.1 LTS 6.11.0-29-generic, locale en_US.UTF-8)
+    ! Flutter version 3.7.7 on channel unknown at /sdks/flutter
+      Currently on an unknown channel. Run `flutter channel` to switch to an official channel.
+      If that doesn't fix the issue, reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install.
+    ! Unknown upstream repository.
+      Reinstall Flutter by following instructions at https://flutter.dev/docs/get-started/install.
+[✓] Android toolchain - develop for Android devices (Android SDK version 33.0.1)
+[✗] Chrome - develop for the web (Cannot find Chrome executable at google-chrome)
+    ! Cannot find Chrome. Try setting CHROME_EXECUTABLE to a Chrome executable.
+[✗] Linux toolchain - develop for Linux desktop
+    ✗ CMake is required for Linux development.
+      It is likely available from your distribution (e.g.: apt install cmake), or can be downloaded from https://cmake.org/download/
+[!] Android Studio (not installed)
+[✓] Connected device (1 available)
+[✓] HTTP Host Availability
 
-Because acpi_launcher requires SDK version >=3.3.3 <4.0.0, version solving failed.
-pub get failed
-command: "/sdks/flutter/bin/cache/dart-sdk/bin/dart __deprecated_pub --color --directory . get --example"
-pub env: {
-  "FLUTTER_ROOT": "/sdks/flutter",
-  "PUB_ENVIRONMENT": "flutter_bot:flutter_cli:verify:run",
-  "PUB_CACHE": "/root/.pub-cache",
-}
-exit code: 1
-
-
-root@0e12f649691a:~/lgsi-homelauncher# flutter run linux
-Target file "linux" not found.
-root@0e12f649691a:~/lgsi-homelauncher# flutter run -f linux
-Could not find an option or flag "-f".
-
-
-Run 'flutter -h' (or 'flutter <command> -h') for available flutter commands and options.
-root@0e12f649691a:~/lgsi-homelauncher# flutter run -d linux
-Running "flutter pub get" in lgsi-homelauncher...
-Resolving dependencies... 
-The current Dart SDK version is 2.19.4.
-
-Because acpi_launcher requires SDK version >=3.3.3 <4.0.0, version solving failed.
-pub get failed
-command: "/sdks/flutter/bin/cache/dart-sdk/bin/dart __deprecated_pub --color --directory . get --example"
-pub env: {
-  "FLUTTER_ROOT": "/sdks/flutter",
-  "PUB_ENVIRONMENT": "flutter_bot:flutter_cli:verify:run",
-  "PUB_CACHE": "/root/.pub-cache",
-}
-exit code: 1
-
-
-root@0e12f649691a:~/lgsi-homelauncher# flutter run -d web
-No supported devices found with name or id matching 'web'.
-
-The following devices were found:
-Linux (desktop) • linux • linux-x64 • Ubuntu 22.04.1 LTS 6.11.0-29-generic
-root@0e12f649691a:~/lgsi-homelauncher# flutter run -d Linux
-Running "flutter pub get" in lgsi-homelauncher...
-Resolving dependencies... 
-The current Dart SDK version is 2.19.4.
-
-Because acpi_launcher requires SDK version >=3.3.3 <4.0.0, version solving failed.
-pub get failed
-command: "/sdks/flutter/bin/cache/dart-sdk/bin/dart __deprecated_pub --color --directory . get --example"
-pub env: {
-  "FLUTTER_ROOT": "/sdks/flutter",
-  "PUB_ENVIRONMENT": "flutter_bot:flutter_cli:verify:run",
-  "PUB_CACHE": "/root/.pub-cache",
-}
-exit code: 1
-
-
-root@0e12f649691a:~/lgsi-homelauncher# flutter run -d Linux
-Running "flutter pub get" in lgsi-homelauncher...
-Resolving dependencies... 
-The current Dart SDK version is 2.19.4.
-
-Because acpi_launcher requires SDK version >=3.3.3 <4.0.0, version solving failed.
-pub get failed
-command: "/sdks/flutter/bin/cache/dart-sdk/bin/dart __deprecated_pub --color --directory . get --example"
-pub env: {
-  "FLUTTER_ROOT": "/sdks/flutter",
-  "PUB_ENVIRONMENT": "flutter_bot:flutter_cli:verify:run",
-  "PUB_CACHE": "/root/.pub-cache",
-}
-exit code: 1
-
-
-root@0e12f649691a:~/lgsi-homelauncher# flutter run -d linux
-Running "flutter pub get" in lgsi-homelauncher...
-Resolving dependencies... 
-The current Dart SDK version is 2.19.4.
-
-Because acpi_launcher requires SDK version >=3.3.3 <4.0.0, version solving failed.
-pub get failed
-command: "/sdks/flutter/bin/cache/dart-sdk/bin/dart __deprecated_pub --color --directory . get --example"
-pub env: {
-  "FLUTTER_ROOT": "/sdks/flutter",
-  "PUB_ENVIRONMENT": "flutter_bot:flutter_cli:verify:run",
-  "PUB_CACHE": "/root/.pub-cache",
-}
-exit code: 1
-
-
-root@0e12f649691a:~/lgsi-homelauncher# 
+! Doctor found issues in 4 categories.
+root@0e12f649691a:/opt# 
