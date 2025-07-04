@@ -1,8 +1,5 @@
-주간 업무 전달드립니다. 
-
-인도 측 최종 런처앱 기준 장치/제어 모니터링 feature 에서 다수 미구현이 확인되어, 현장에서 가장 많이 사용될 실외기/실외기를 최우선으로 점검하고 있습니다. 
-
-실외기 기능 테스트 케이스 총 7건 중 0건에 대해 성공하여 가이드 전달 및 데모 영상으로 구현 확인 
-실내기 기능 테스트 케이스 37건 중 2건 성공하여, 순차적으로 가이드 전달 및 데모 영상으로 7건 구현 확인 
-
--> 머지 후 최종 런쳐앱에서 확인 필요합니다.
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ sudo docker start d599bb9f1a94
+[sudo] password for minzzl: 
+d599bb9f1a94
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ sudo docker exec -it d599bb9f1a94 /bin/bash
+root@d599bb9f1a94:/#   
