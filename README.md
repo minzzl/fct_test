@@ -1,136 +1,58 @@
-root@d599bb9f1a94:~# apt install snapd
-Reading package lists... Done
-Building dependency tree... Done
-Reading state information... Done
-The following additional packages will be installed:
-  apparmor fuse3 libfuse3-3 libnss-systemd libpam-systemd libsystemd-dev libsystemd0 libudev1 squashfs-tools systemd systemd-hwe-hwdb systemd-sysv
-  systemd-timesyncd udev
-Suggested packages:
-  apparmor-profiles-extra apparmor-utils zenity | kdialog systemd-container libtss2-esys-3.0.2-0 libtss2-mu0 libtss2-rc0 policykit-1
-The following NEW packages will be installed:
-  apparmor fuse3 libfuse3-3 snapd squashfs-tools systemd-hwe-hwdb udev
-The following packages will be upgraded:
-  libnss-systemd libpam-systemd libsystemd-dev libsystemd0 libudev1 systemd systemd-sysv systemd-timesyncd
-8 upgraded, 7 newly installed, 0 to remove and 123 not upgraded.
-Need to get 35.9 MB of archives.
-After this operation, 123 MB of additional disk space will be used.
-Do you want to continue? [Y/n] y
-Get:1 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libsystemd-dev amd64 249.11-0ubuntu3.16 [306 kB]
-Get:2 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libnss-systemd amd64 249.11-0ubuntu3.16 [133 kB]
-Get:3 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd-timesyncd amd64 249.11-0ubuntu3.16 [31.2 kB]
-Get:4 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd-sysv amd64 249.11-0ubuntu3.16 [10.5 kB]
-Get:5 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libpam-systemd amd64 249.11-0ubuntu3.16 [203 kB]
-Get:6 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd amd64 249.11-0ubuntu3.16 [4,581 kB]
-Get:7 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libsystemd0 amd64 249.11-0ubuntu3.16 [317 kB]                                                     
-Get:8 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 libudev1 amd64 249.11-0ubuntu3.16 [76.7 kB]                                                       
-Get:9 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 udev amd64 249.11-0ubuntu3.16 [1,557 kB]                                                          
-Get:10 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 apparmor amd64 3.0.4-2ubuntu2.4 [598 kB]                                                         
-Get:11 http://archive.ubuntu.com/ubuntu jammy/main amd64 libfuse3-3 amd64 3.10.5-1build1 [81.2 kB]                                                                
-Get:12 http://archive.ubuntu.com/ubuntu jammy/main amd64 fuse3 amd64 3.10.5-1build1 [24.7 kB]                                                                     
-Get:13 http://archive.ubuntu.com/ubuntu jammy/main amd64 squashfs-tools amd64 1:4.5-3build1 [159 kB]                                                              
-Get:14 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 snapd amd64 2.67.1+22.04 [27.8 MB]                                                               
-Get:15 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 systemd-hwe-hwdb all 249.11.5 [3,228 B]                                                          
-Fetched 35.9 MB in 32s (1,115 kB/s)                                                                                                                               
-debconf: delaying package configuration, since apt-utils is not installed
-(Reading database ... 46552 files and directories currently installed.)
-Preparing to unpack .../0-libsystemd-dev_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking libsystemd-dev:amd64 (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Preparing to unpack .../1-libnss-systemd_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking libnss-systemd:amd64 (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Preparing to unpack .../2-systemd-timesyncd_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking systemd-timesyncd (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Preparing to unpack .../3-systemd-sysv_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking systemd-sysv (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Preparing to unpack .../4-libpam-systemd_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking libpam-systemd:amd64 (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Preparing to unpack .../5-systemd_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking systemd (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Preparing to unpack .../6-libsystemd0_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking libsystemd0:amd64 (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Setting up libsystemd0:amd64 (249.11-0ubuntu3.16) ...
-(Reading database ... 46552 files and directories currently installed.)
-Preparing to unpack .../libudev1_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking libudev1:amd64 (249.11-0ubuntu3.16) over (249.11-0ubuntu3.12) ...
-Setting up libudev1:amd64 (249.11-0ubuntu3.16) ...
-Selecting previously unselected package udev.
-(Reading database ... 46552 files and directories currently installed.)
-Preparing to unpack .../0-udev_249.11-0ubuntu3.16_amd64.deb ...
-Unpacking udev (249.11-0ubuntu3.16) ...
-Selecting previously unselected package apparmor.
-Preparing to unpack .../1-apparmor_3.0.4-2ubuntu2.4_amd64.deb ...
-Unpacking apparmor (3.0.4-2ubuntu2.4) ...
-Selecting previously unselected package libfuse3-3:amd64.
-Preparing to unpack .../2-libfuse3-3_3.10.5-1build1_amd64.deb ...
-Unpacking libfuse3-3:amd64 (3.10.5-1build1) ...
-Selecting previously unselected package fuse3.
-Preparing to unpack .../3-fuse3_3.10.5-1build1_amd64.deb ...
-Unpacking fuse3 (3.10.5-1build1) ...
-Selecting previously unselected package squashfs-tools.
-Preparing to unpack .../4-squashfs-tools_1%3a4.5-3build1_amd64.deb ...
-Unpacking squashfs-tools (1:4.5-3build1) ...
-Selecting previously unselected package snapd.
-Preparing to unpack .../5-snapd_2.67.1+22.04_amd64.deb ...
-Unpacking snapd (2.67.1+22.04) ...
-Selecting previously unselected package systemd-hwe-hwdb.
-Preparing to unpack .../6-systemd-hwe-hwdb_249.11.5_all.deb ...
-Unpacking systemd-hwe-hwdb (249.11.5) ...
-Setting up squashfs-tools (1:4.5-3build1) ...
-Setting up systemd (249.11-0ubuntu3.16) ...
-/usr/lib/tmpfiles.d/static-nodes-permissions.conf:17: Failed to resolve group 'kvm'.
-/usr/lib/tmpfiles.d/static-nodes-permissions.conf:18: Failed to resolve group 'kvm'.
-/usr/lib/tmpfiles.d/static-nodes-permissions.conf:19: Failed to resolve group 'kvm'.
-Setting up apparmor (3.0.4-2ubuntu2.4) ...
-debconf: unable to initialize frontend: Dialog
-debconf: (No usable dialog-like program is installed, so the dialog based frontend cannot be used. at /usr/share/perl5/Debconf/FrontEnd/Dialog.pm line 78.)
-debconf: falling back to frontend: Readline
-Created symlink /etc/systemd/system/sysinit.target.wants/apparmor.service → /lib/systemd/system/apparmor.service.
-Setting up systemd-timesyncd (249.11-0ubuntu3.16) ...
-Setting up udev (249.11-0ubuntu3.16) ...
-invoke-rc.d: could not determine current runlevel
-invoke-rc.d: policy-rc.d denied execution of start.
-Setting up libfuse3-3:amd64 (3.10.5-1build1) ...
-Setting up systemd-hwe-hwdb (249.11.5) ...
-Setting up libsystemd-dev:amd64 (249.11-0ubuntu3.16) ...
-Setting up systemd-sysv (249.11-0ubuntu3.16) ...
-Setting up libnss-systemd:amd64 (249.11-0ubuntu3.16) ...
-Setting up fuse3 (3.10.5-1build1) ...
-Setting up libpam-systemd:amd64 (249.11-0ubuntu3.16) ...
-debconf: unable to initialize frontend: Dialog
-debconf: (No usable dialog-like program is installed, so the dialog based frontend cannot be used. at /usr/share/perl5/Debconf/FrontEnd/Dialog.pm line 78.)
-debconf: falling back to frontend: Readline
-Setting up snapd (2.67.1+22.04) ...
-Created symlink /etc/systemd/system/multi-user.target.wants/snapd.apparmor.service → /lib/systemd/system/snapd.apparmor.service.
-Created symlink /etc/systemd/system/multi-user.target.wants/snapd.autoimport.service → /lib/systemd/system/snapd.autoimport.service.
-Created symlink /etc/systemd/system/multi-user.target.wants/snapd.core-fixup.service → /lib/systemd/system/snapd.core-fixup.service.
-Created symlink /etc/systemd/system/multi-user.target.wants/snapd.recovery-chooser-trigger.service → /lib/systemd/system/snapd.recovery-chooser-trigger.service.
-Created symlink /etc/systemd/system/multi-user.target.wants/snapd.seeded.service → /lib/systemd/system/snapd.seeded.service.
-Created symlink /etc/systemd/system/cloud-final.service.wants/snapd.seeded.service → /lib/systemd/system/snapd.seeded.service.
-Unit /lib/systemd/system/snapd.seeded.service is added as a dependency to a non-existent unit cloud-final.service.
-Created symlink /etc/systemd/system/multi-user.target.wants/snapd.service → /lib/systemd/system/snapd.service.
-Created symlink /etc/systemd/system/timers.target.wants/snapd.snap-repair.timer → /lib/systemd/system/snapd.snap-repair.timer.
-Created symlink /etc/systemd/system/sockets.target.wants/snapd.socket → /lib/systemd/system/snapd.socket.
-Created symlink /etc/systemd/system/final.target.wants/snapd.system-shutdown.service → /lib/systemd/system/snapd.system-shutdown.service.
-Processing triggers for dbus (1.12.20-2ubuntu4.1) ...
-Processing triggers for libc-bin (2.35-0ubuntu3.8) ...
-root@d599bb9f1a94:~# snap install flutter --classic
-error: cannot communicate with server: Post "http://localhost/v2/snaps/flutter": dial unix /run/snapd.socket: connect: no such file or directory
-root@d599bb9f1a94:~# systemctl restart snapd
+좋은 로그 공유해주셨어요. 결론부터 말씀드리면:
+
+⸻
+
+❌ 현재 도커 컨테이너에서는 snap을 쓸 수 없습니다.
+
+이유는?
+
+컨테이너 환경은 일반적으로 Systemd init 시스템 없이 동작합니다. 그런데 snapd는 systemd 기반 서비스로 동작하기 때문에 다음과 같은 오류가 발생하는 겁니다:
+
 System has not been booted with systemd as init system (PID 1). Can't operate.
-Failed to connect to bus: Host is down
-root@d599bb9f1a94:~# snap --version
+
+dial unix /run/snapd.socket: connect: no such file or directory
 
 
+⸻
+
+🚫 snap install flutter --classic은 컨테이너에서 불가능ㅗ
+
+flutter를 snap으로 설치하는 건 일반적인 Ubuntu 데스크탑에서 가능한 방법이고, Docker 컨테이너에서는 snap 기반 설치는 작동하지 않습니다.
+
+⸻
+
+✅ 대안 1: APT 혹은 Git으로 직접 설치
+
+Flutter를 설치하려면 snap 대신 git clone 방식으로 설치하세요:
+
+git clone https://github.com/flutter/flutter.git -b stable
+export PATH="$PATH:`pwd`/flutter/bin"
+flutter --version
+
+필요하다면 .bashrc에 PATH 추가도 가능합니다.
+
+⸻
+
+✅ 대안 2: Docker 공식 flutter 이미지 사용
+
+Flutter 개발 환경이 필요하다면, 오히려 Flutter가 사전 설치된 Docker 이미지를 쓰는 것이 훨씬 깔끔합니다.
+
+docker run -it --name flutter-dev -v $HOME/flutter-dev:/home/flutter -p 8080:8080 cirrusci/flutter:latest bash
+
+이렇게 하면 flutter, dart 등이 이미 세팅된 컨테이너가 실행됩니다.
+
+⸻
+
+✅ 요약
+
+시도한 것	결과
+snap install flutter	❌ systemd 없어서 snap 작동 불가
+해결 방법 1	✅ git clone으로 flutter 수동 설치
+해결 방법 2	✅ Flutter 사전 설치된 Docker 이미지 사용
 
 
+⸻
 
-snap    2.67.1+22.04
-snapd   unavailable
-series  -
-root@d599bb9f1a94:~# 
-root@d599bb9f1a94:~# 
-root@d599bb9f1a94:~# 
-root@d599bb9f1a94:~# 
-root@d599bb9f1a94:~# 
-root@d599bb9f1a94:~# snap install flutter --classic
-error: cannot communicate with server: Post "http://localhost/v2/snaps/flutter": dial unix /run/snapd.socket: connect: no such file or directory
-root@d599bb9f1a94:~# 
+필요하다면 flutter 직접 설치하는 bash 스크립트도 만들어드릴게요. 어떤 방식이 더 나을까요?
+	•	A. 지금 컨테이너에 직접 설치 (git 방식)
+	•	B. Flutter 전용 이미지 사용해서 새 컨테이너 만들기
