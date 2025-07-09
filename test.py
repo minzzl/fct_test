@@ -1,45 +1,23 @@
-PS D:\Code\acpi-launcher> flutter run
-Connected devices:
-Windows (desktop) • windows • windows-x64    • Microsoft Windows [Version 10.0.19045.4894]
-Chrome (web)      • chrome  • web-javascript • Google Chrome 138.0.7204.97 
-Edge (web)        • edge    • web-javascript • Microsoft Edge 138.0.3351.65
-[1]: Windows (windows)
-[2]: Chrome (chrome)
-[3]: Edge (edge)
-Please choose one (or "q" to quit): 1
-"en": 2 untranslated message(s).
-To see a detailed report, use the untranslated-messages-file       
-option in the l10n.yaml file:
-untranslated-messages-file: desiredFileName.txt
-<other option>: <other selection>
+주간 업무 전달드립니다.
+현장에서 가장 많이 사용될 실내기 기능을 우선적으로  가이드 전달하였고, 실내기에서 일부 기능제외 정상 동작하는 것을 확인하였습니다. 
  
+
+실내기(~7/9) 
+
+모든 제어 동작은 확인하였으나, 일부 기능에서 다소 미흡한 부분 발견하여 추가 가이드 전달한 상태입니다. 
+ 완료 보고를 받았긴 하나 확인이 필요합니다. 
+
+단독 공기청정 및 인체 감지 기능이 off 되어있음에도 필드가 생성되는 현상
+추가로, uv 제어 나 협조 제어 관련한 아이콘은 아직 없어, 아이콘이 제작되면 바로 적용할 수 있도록 개발요청하였고, 디자인 쪽에 추가 아이콘 요청드렸습니다. 
+관련 이슈 링크 : http://jira.lge.com/issue/projects/NETGUIAI/issues/NETGUIAI-205?filter=reportedbyme
  
-This will generate a JSON format file containing all messages that 
-need to be translated.
-Launching lib\main.dart on Windows in debug mode...
-CMake Warning (dev) at flutter/ephemeral/.plugin_symlinks/flutter_inappwebview_windows/windows/CMakeLists.txt:31 (add_custom_command):
-  The following keywords are not supported when using
-  add_custom_command(TARGET): DEPENDS.
- 
-  Policy CMP0175 is not set: add_custom_command() rejects invalid arguments.
-  Run "cmake --help-policy CMP0175" for policy details.  Use the cmake_policy
-  command to set the policy and suppress this warning.
-This warning is for project developers.  Use -Wno-dev to suppress it.
- 
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/dxhrv/dxhrv_control_panel_widget.dart(56,21): error GC6690633: No named parameter with the name 'lowerLimit'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/dxhrv/dxhrv_control_panel_widget.dart(110,21): error GC6690633: No named parameter with the name 'lowerLimit'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/ahu/ahu_control_panel_widget.dart(59,21): error GC6690633: No named parameter with the name 'lowerLimit'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/awhp/awhp_control_panel_widget.dart(56,21): error GC6690633: No named parameter with the name 'lowerLimit'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/awhp/awhp_control_panel_widget.dart(111,21): error GC6690633: No named parameter with the name 'lowerLimit'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/chiller/chiller_control_panel_widget.dart(79,21): error GC6690633: No named parameter with the name 'lowerLimit'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/chiller/chiller_control_panel_widget.dart(97,21): error GC6690633: No named parameter with the name 'lowerLimit'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/idu/idu_control_panel_widget.dart(438,40): error G75B77105: Member not found: 'tempDefaultLimitLower'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/idu/idu_control_panel_widget.dart(440,40): error G75B77105: Member not found: 'tempDefaultLimitUpper'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/common/temperature_widget.dart(30,40): error G75B77105: Member not found: 'tempDefaultLimitUpper'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/common/temperature_widget.dart(34,46): error G75B77105: Member not found: 'tempDefaultLimitUpper'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/common/temperature_widget.dart(49,40): error G75B77105: Member not found: 'tempDefaultLimitLower'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-/C:/Users/USER/AppData/Local/Pub/Cache/git/acp6-control-panel-edbc87b922d9416810e44c1cd61910b964bc9776/lib/widgets/common/temperature_widget.dart(53,46): error G75B77105: Member not found: 'tempDefaultLimitLower'. [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppCommon.targets(254,5): error MSB8066: 'D:\Code\acpi-launcher\build\windows\x64\CMakeFiles\35ce70ad6ce467979ebb4d575bff5915\flutter_windows.dll.rule;D:\Code\acpi-launcher\build\windows\x64\CMakeFiles\5e89fdc1407f533985656776898eea4e\flutter_assemble.rule;D:\Code\acpi-launcher\windows\flutter\CMakeLists.txt'에 대한 사용자 지정 빌드가 종료되었습니다(코드 1). [D:\Code\acpi-launcher\build\windows\x64\flutter\flutter_assemble.vcxproj]
-Building Windows application...                                    40.6s
-Error: Build process failed.
-PS D:\Code\acpi-launcher>
+실외기 (~7/10) 
+
+실외기 제어가 되지 않아 관련 이슈 다시 정리하여  si 측에 이슈 보고 한 상태입니다.
+관련 이슈 링크: http://jira.lge.com/issue/projects/NETGUIAI/issues/NETGUIAI-178?filter=reportedbyme
+
++ 명확한 가이드와.. 데모를 통해 확인을하더라도 실제 개발에 제대로 반영이 되지 않은 것들이 많았습니다. 머지 이후 런쳐앱을 통해 확인하는데까지 걸리는 시간을 줄이기 위해 직접 빌드하여 확인할 수 있도록 환경 세팅하였습니다. 금일부터는 바로 머지하여 테스트 할 수 있도록 하겠습니다.
+
+
+
+추가로 wifi 실패 이슈 관련하여, 상 책임님께 말씀드려서 시료 5개 확보 하였고, 금일 오후에 시료 세팅 예정입니다.
