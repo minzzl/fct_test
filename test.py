@@ -76,8 +76,21 @@ def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
             # journalctl 로그를 파일로 저장
             current_time = time.strftime('%Y%m%d_%H%M%S')
             journalctl_log_file = f"/lg_rw/fct_test/fail_log_{current_time}.txt"
-            subprocess.run(['journalctl', '>', journalctl_log_file], shell=True)
+            subprocess.run(f'journalctl > {journalctl_log_file}', shell=True)
+
+            # demesg 를 파일로 저장
+            dmesg_log_file = f"/lg_rw/fct_test/dmesg_log_{current_time}.txt"
+            subprocess.run(f'dmesg > {dmesg_log_file}', shell=True)
+
+            # flag 파일 생성
+            flag_file = "/lg_rw/fct_test/wlan0_test_fail.flag"
+            with open(flag_file, "w") as f:
+                f.write("1")
+
+            # /sbin/ifconfig -a wlan0 2>&1 | /usr/bin/awk '/HWaddr/ {print $5}' 출력 값을 파일에 저장
+            subprocess.run(f"/sbin/ifconfig -a wlan0 2>&1 | /usr/bin/awk '/HWaddr/ {{print $5}}' > /lg_rw/fct_test/wlan0_test_fail_{current_time}.txt", shell=True)
             
+
             print("[WIFI] FAIL (Timeout)")
             return
         
