@@ -4,14 +4,31 @@ import time
 import sys
 import argparse
 import os
- 
+
 # 전역 변수 초기화
 return_data = ""
- 
+reload_return_data = ""  # [ADDED] 드라이버 리로드 후 결과 저장
+
 def log(message):
     if args.debug:
         print(f"[log] {message}")
- 
+
+def reload_driver():  # [ADDED]
+   log("[driver] Reloading WiFi driver...")
+   subprocess.run('systemctl stop connman', shell=True)
+   #sleep(3)  # [ADDED] 잠시 대기
+   time.sleep(3)  # 안정화를 위한 대기
+   subprocess.run('rmmod moal', shell=True)
+   time.sleep(3)  # 안정화를 위한 대기
+   subprocess.run('rmmod mlan', shell=True)
+   time.sleep(3)  # 안정화를 위한 대기
+   subprocess.run('systemctl restart connman', shell=True)
+   time.sleep(3)  # 안정화를 위한 대기
+   subprocess.run('insmod /lib/modules/iw61x/extra/mlan.ko', shell=True)
+   time.sleep(3)  # 안정화를 위한 대기
+   subprocess.run('insmod /lib/modules/iw61x/extra/moal.ko mod_para=nxp/wifi_mod_para.conf', shell=True)
+   time.sleep(3)  # 안정화를 위한 대기
+
 def get_wifi_profiles():
     # WiFi 프로파일 목록을 가져오는 명령어 실행
     result = subprocess.run(['luna-send', '-n', '1', '-f', 'luna://com.webos.service.wifi/getprofilelist', '{}'], capture_output=True, text=True)
@@ -21,7 +38,7 @@ def get_wifi_profiles():
     else:
         log("Failed to retrieve WiFi profiles")
         return None
- 
+
 def delete_wifi_profile(profile_id):
     # 특정 프로파일을 삭제하는 명령어 실행
     result = subprocess.run(['luna-send', '-n', '1', '-f', 'luna://com.webos.service.wifi/deleteprofile', json.dumps({"profileId": profile_id})], capture_output=True, text=True)
@@ -32,7 +49,7 @@ def delete_wifi_profile(profile_id):
     else:
         log(f"Failed to delete profile with ID {profile_id}")
         return False
- 
+
 def connect_to_network(ssid, passKey):
     connect_command = [
         "luna-send", "-n", "1", "-f", "luna://com.webos.service.wifi/connect",
@@ -55,7 +72,7 @@ def connect_to_network(ssid, passKey):
     else:
         print(f"[WIFI] FAIL (Failed to connect to SSID '{ssid}')")
         return False
- 
+
 def ping_test(targetIp):
     ping_command = ["ping", "-I", "wlan0", "-c", "4", targetIp]
     result = subprocess.run(ping_command, capture_output=True, text=True)
@@ -64,9 +81,10 @@ def ping_test(targetIp):
         print("[WIFI] OK")
     else:
         print("[WIFI] FAIL (Ping test failed)")
- 
+
 def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
     global return_data  # 전역 변수 사용을 명시적으로 선언
+    driver_reload_needed = False  # [ADDED] 드라이버 리로드 필요 여부 플래그
     return_data = ""  # 초기화
     start_time = time.time()
     while True:
@@ -75,7 +93,7 @@ def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
            flag_file = "/lg_rw/fct_test/wlan0_test_fail.flag"
            with open(flag_file, "w") as f:
                f.write("1")
- 
+
            current_time = time.strftime('%Y%m%d_%H%M%S')  # [MODIFIED]
            log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid_to_find.replace(' ', '_')}"  # [ADDED]
            os.makedirs(log_dir, exist_ok=True)  # [ADDED]
@@ -95,6 +113,7 @@ def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
            with open(f"{log_dir}/summary.txt", "w") as f:  # [ADDED]
                f.write(f"SSID: {ssid_to_find}\n")
                f.write(f"Signal: {signal if 'signal' in locals() else 'N/A'}\n")
+               f.write(f"Driver Reloaded: {'Yes' if driver_reload_needed else 'No'}\n")  # [ADDED]
                f.write("Result: FAIL (Timeout or Signal out of range)\n")
            # 마스터 요약 로그에 한 줄 추가
            with open("/lg_rw/fct_test/test_summary_index.log", "a") as f:  # [ADDED]
@@ -112,6 +131,28 @@ def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
         # Parse the JSON output
         data = json.loads(result.stdout)
         return_data += json.dumps(data, indent=2) + "\n"  # 누적
+        
+        # [ADDED] 에러코드 5 처리 (WiFi 기술 사용 불가)
+        if data.get("errorCode") == 5 and data.get("errorText") == "WiFi technology unavailable":
+           log("[driver] WiFi technology unavailable - reloading driver...")
+           reload_driver()
+           driver_reload_needed = True  # 드라이버 리로드 필요 플래그 설정
+           # 다시 findnetworks 실행 후 결과 저장
+           retry_result = subprocess.run(
+               ["luna-send", "-n", "1", "-f", "luna://com.webos.service.wifi/findnetworks", "{}"],
+               capture_output=True,
+               text=True
+           )
+           retry_data = json.loads(retry_result.stdout)
+           reload_return_data += json.dumps(retry_data, indent=2) + "\n"
+           # 로그 디렉토리 생성
+           current_time = time.strftime('%Y%m%d_%H%M%S')
+           log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid_to_find.replace(' ', '_')}"
+           os.makedirs(log_dir, exist_ok=True)
+           with open(f"{log_dir}/reload_driver.json", "w") as f:
+               f.write(reload_return_data)
+           # 이후 정상적인 흐름 계속됨
+           data = retry_data  # 이후 로직에서 사용
         
         if data.get("returnValue"):
             networks = data.get("foundNetworks", [])
@@ -135,7 +176,7 @@ def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
             print("[WIFI] FAIL (Failed to find networks)")
         
         time.sleep(5)
- 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="WiFi network management script.")
     parser.add_argument('ssid', type=str, help='SSID of the WiFi network to connect to')
@@ -175,26 +216,3 @@ if __name__ == "__main__":
                 log(f"Deleting profile with SSID: {ssid} and Profile ID: {profile_id} after connection")
                 delete_wifi_profile(profile_id)
                 break
-
-
-이 코드에서, find_network 함수 내부에 추가하고 싶은 로직이 있어.
-가끔 findnetworks 호출이후의 응답이 다음과 같이 나오는 경우가 있어.
-
-{
-  "errorCode": 5,
-  "returnValue": false,
-  "errorText": "WiFi technology unavailable"
-}
-이 때의 문제가 드라이버 문제라고 생각하고 있어. 
-reload driver -> re-run API -> write log into "../reload_driver.json" 이렇게 추가를 하고 싶은데, 
-드라이버를 리로드 하는 명령어는 6단계야.
-
-  subprocess.run('systemctl stop connman', shell=True)
-                subprocess.run('rmmod moal', shell=True)
-                subprocess.run('rmmod mlan', shell=True)
-                subprocess.run('systemctl restart connman', shell=True)
-                subprocess.run('insmod /lib/modules/iw61x/extra/mlan.ko', shell=True)
-                subprocess.run('insmod /lib/modules/iw61x/extra/moal.ko mod_para=nxp/wifi_mod_para.conf', shell=True)
-
-6단계를 실행하고 나서, 이후의 findnetwork 의 응답으로는 return_data 말고 다른 변수에 누적시켜서, reload_driver.json  파일에 저장되도록 해서, 드라이버 리로드 전과 후의 응답을 구분할 수 있도록 코드를 수정해
-
