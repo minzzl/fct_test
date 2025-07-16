@@ -26,3 +26,33 @@ fail_log_20250713_100959.txt                           wifi_test_20250715_214536
 fail_log_20250713_101155.txt                           wifi_test_20250715_214734_ssid-next_test
 fail_log_20250713_101353.txt                           wifi_test_20250715_214931_ssid-next_test
 fail_log_20250713_101550.txt                           wifi_test_20250715_215128_ssid-next_test
+
+
+[root@webOSNano-unofficial /lg_rw/fct_test]# cat zip.py
+import os
+import zipfile
+# 기준 디렉토리
+base_dir = os.getcwd()
+# 압축 대상 패턴
+prefix = "wifi_test_"
+suffix = "_ssid-next_test"
+# zip 파일 이름
+output_zip = "wifi_all_tests.zip"
+# 기존에 잘못 만들어진 zip 파일들 삭제
+for file in os.listdir(base_dir):
+   if file.endswith(".zip") and file != output_zip:
+       if file.startswith(prefix) and file.endswith(suffix + ".zip"):
+           os.remove(os.path.join(base_dir, file))
+           print(f"[삭제됨] {file}")
+# 압축 파일 만들기
+with zipfile.ZipFile(output_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+   for folder in os.listdir(base_dir):
+       full_path = os.path.join(base_dir, folder)
+       if os.path.isdir(full_path) and folder.startswith(prefix) and folder.endswith(suffix):
+           for root, dirs, files in os.walk(full_path):
+               for file in files:
+                   file_path = os.path.join(root, file)
+                   arcname = os.path.relpath(file_path, start=base_dir)
+                   zipf.write(file_path, arcname)
+                   print(f"[추가됨] {arcname}")
+print(f"\n[완료] {output_zip} 생성 완료 ✅")
