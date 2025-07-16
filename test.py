@@ -1,3 +1,10 @@
+File "/lg_rw/fct_test/wlan0_test.py", line 220, in <module>
+find_network(args.ssid, args.min_signal, args.max_signal, args.passKey, args.targetIp)
+File "/lg_rw/fct_test/wlan0_test.py", line 161, in find_network
+reload_return_data += json.dumps(retry_data, indent=2) + "\n"
+UnboundLocalError: local variable 'reload_return_data' referenced before assignment
+
+
 import subprocess
 import json
 import time
@@ -15,19 +22,12 @@ def log(message):
 
 def reload_driver():  # [ADDED]
    log("[driver] Reloading WiFi driver...")
-   subprocess.run('systemctl stop connman', shell=True)
-   #sleep(3)  # [ADDED] 잠시 대기
+   env = os.environ.copy()
+   env["PATH"] += os.pathsep + "/sbin" 
+   subprocess.run('insmod /lib/modules/iw61x/extra/mlan.ko', shell=True, env=env)
    time.sleep(3)  # 안정화를 위한 대기
-   subprocess.run('rmmod moal', shell=True)
-   time.sleep(3)  # 안정화를 위한 대기
-   subprocess.run('rmmod mlan', shell=True)
-   time.sleep(3)  # 안정화를 위한 대기
-   subprocess.run('systemctl restart connman', shell=True)
-   time.sleep(3)  # 안정화를 위한 대기
-   subprocess.run('insmod /lib/modules/iw61x/extra/mlan.ko', shell=True)
-   time.sleep(3)  # 안정화를 위한 대기
-   subprocess.run('insmod /lib/modules/iw61x/extra/moal.ko mod_para=nxp/wifi_mod_para.conf', shell=True)
-   time.sleep(3)  # 안정화를 위한 대기
+   subprocess.run('insmod /lib/modules/iw61x/extra/moal.ko mod_para=nxp/wifi_mod_para.conf', shell=True, env=env)
+   time.sleep(20)  # 안정화를 위한 대기
 
 def get_wifi_profiles():
     # WiFi 프로파일 목록을 가져오는 명령어 실행
@@ -71,6 +71,27 @@ def connect_to_network(ssid, passKey):
         return True
     else:
         print(f"[WIFI] FAIL (Failed to connect to SSID '{ssid}')")
+        # 🔽 실패 시 로그 디렉토리 구성
+        current_time = time.strftime('%Y%m%d_%H%M%S')
+        log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid.replace(' ', '_')}_connect_fail"
+        os.makedirs(log_dir, exist_ok=True)
+        # connect 응답 저장
+        with open(f"{log_dir}/connect_result.json", "w") as f:
+            f.write(json.dumps(data, indent=2))
+        # journalctl, dmesg, ifconfig
+        subprocess.run(f'journalctl > {log_dir}/journalctl.log', shell=True)
+        subprocess.run(f'dmesg > {log_dir}/dmesg.log', shell=True)
+        subprocess.run(
+            f"/sbin/ifconfig -a wlan0 2>&1 | /usr/bin/awk '/HWaddr/ {{print $5}}' > {log_dir}/ifconfig.txt",
+            shell=True
+        )
+        # summary
+        with open(f"{log_dir}/summary.txt", "w") as f:
+            f.write(f"SSID: {ssid}\n")
+            f.write("Result: FAIL (connect_to_network)\n")
+        # index
+        with open("/lg_rw/fct_test/test_summary_index.log", "a") as f:
+            f.write(f"[{current_time}] SSID: {ssid} - FAIL (connect_to_network)\n")
         return False
 
 def ping_test(targetIp):
