@@ -1,10 +1,3 @@
-File "/lg_rw/fct_test/wlan0_test.py", line 220, in <module>
-find_network(args.ssid, args.min_signal, args.max_signal, args.passKey, args.targetIp)
-File "/lg_rw/fct_test/wlan0_test.py", line 161, in find_network
-reload_return_data += json.dumps(retry_data, indent=2) + "\n"
-UnboundLocalError: local variable 'reload_return_data' referenced before assignment
-
-
 import subprocess
 import json
 import time
@@ -15,6 +8,7 @@ import os
 # 전역 변수 초기화
 return_data = ""
 reload_return_data = ""  # [ADDED] 드라이버 리로드 후 결과 저장
+current_time =""
 
 def log(message):
     if args.debug:
@@ -51,6 +45,7 @@ def delete_wifi_profile(profile_id):
         return False
 
 def connect_to_network(ssid, passKey):
+    global current_time
     connect_command = [
         "luna-send", "-n", "1", "-f", "luna://com.webos.service.wifi/connect",
         json.dumps({
@@ -72,7 +67,6 @@ def connect_to_network(ssid, passKey):
     else:
         print(f"[WIFI] FAIL (Failed to connect to SSID '{ssid}')")
         # 🔽 실패 시 로그 디렉토리 구성
-        current_time = time.strftime('%Y%m%d_%H%M%S')
         log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid.replace(' ', '_')}_connect_fail"
         os.makedirs(log_dir, exist_ok=True)
         # connect 응답 저장
@@ -104,7 +98,9 @@ def ping_test(targetIp):
         print("[WIFI] FAIL (Ping test failed)")
 
 def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
+    global current_time
     global return_data  # 전역 변수 사용을 명시적으로 선언
+    global reload_return_data
     driver_reload_needed = False  # [ADDED] 드라이버 리로드 필요 여부 플래그
     return_data = ""  # 초기화
     start_time = time.time()
@@ -115,7 +111,6 @@ def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
            with open(flag_file, "w") as f:
                f.write("1")
 
-           current_time = time.strftime('%Y%m%d_%H%M%S')  # [MODIFIED]
            log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid_to_find.replace(' ', '_')}"  # [ADDED]
            os.makedirs(log_dir, exist_ok=True)  # [ADDED]
            # findnetworks 결과 저장
@@ -167,7 +162,6 @@ def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
            retry_data = json.loads(retry_result.stdout)
            reload_return_data += json.dumps(retry_data, indent=2) + "\n"
            # 로그 디렉토리 생성
-           current_time = time.strftime('%Y%m%d_%H%M%S')
            log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid_to_find.replace(' ', '_')}"
            os.makedirs(log_dir, exist_ok=True)
            with open(f"{log_dir}/reload_driver.json", "w") as f:
@@ -208,6 +202,7 @@ if __name__ == "__main__":
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     
     args = parser.parse_args()
+    current_time = time.strftime('%Y%m%d_%H%M%S')  # [MODIFIED]
     
     profiles = get_wifi_profiles()
     
