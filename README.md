@@ -1,4 +1,28 @@
-최하영/연구원/네트워크제어개발팀(hayoung0.choi)  연구원님, 초기 페이지 진입시 의도한 예상 동작과 다른듯하여 리포트 드립니다!
-
->> 07월 15일자 이력 앱 확인 결과, 초기 페이지 진입시(조회 당시 7월 16일) 다른 일자의 이력도 조회되는 것처럼 보입니다. 
-API 확인시, 초기 페이지 진입시 날짜가 7월 16일 인경우, 7월 16일 0시 이후 데이터를 조회 했을 때 7월 16일 데이터만 조회되는 것처럼 보여지는데  해당 부분 한번 더 확인 부탁드리겠습니다. 혹 다른 방법으로 조회하고 계시다면, 해당 api 부분에서 이슈 있는지 검토할 수 있도록 
+wifi_test_20250715_075327_ssid-next_test
+fail_log_20250713_091746.txt                           wifi_test_20250715_075731_ssid-next_test
+fail_log_20250713_091943.txt                           wifi_test_20250715_075929_ssid-next_test
+fail_log_20250713_092243.txt                           wifi_test_20250715_080436_ssid-next_test
+fail_log_20250713_092440.txt                           wifi_test_20250715_080943_ssid-next_test
+fail_log_20250713_092740.txt                           wifi_test_20250715_081244_ssid-next_test
+fail_log_20250713_093040.txt                           wifi_test_20250715_081751_ssid-next_test
+fail_log_20250713_093237.txt                           wifi_test_20250715_082051_ssid-next_test
+fail_log_20250713_093537.txt                           wifi_test_20250715_082556_ssid-next_test
+fail_log_20250713_093734.txt                           wifi_test_20250715_082753_ssid-next_test
+fail_log_20250713_093931.txt                           wifi_test_20250715_083054_ssid-next_test
+fail_log_20250713_094128.txt                           wifi_test_20250715_083354_ssid-next_test
+fail_log_20250713_094324.txt                           wifi_test_20250715_083654_ssid-next_test
+fail_log_20250713_094522.txt                           wifi_test_20250715_084200_ssid-next_test
+fail_log_20250713_094822.txt                           wifi_test_20250715_084356_ssid-next_test
+fail_log_20250713_095123.txt                           wifi_test_20250715_084553_ssid-next_test
+fail_log_20250713_095320.txt                           wifi_test_20250715_084853_ssid-next_test
+fail_log_20250713_095517.txt                           wifi_test_20250715_085813_ssid-next_test
+fail_log_20250713_095817.txt                           wifi_test_20250715_090218_ssid-next_test
+fail_log_20250713_100014.txt                           wifi_test_20250715_090415_ssid-next_test
+fail_log_20250713_100211.txt                           wifi_test_20250715_090923_ssid-next_test
+fail_log_20250713_100408.txt                           wifi_test_20250715_213923_ssid-next_test_connect_fail
+fail_log_20250713_100604.txt                           wifi_test_20250715_214124_ssid-next_test
+fail_log_20250713_100802.txt                           wifi_test_20250715_214338_ssid-next_test
+fail_log_20250713_100959.txt                           wifi_test_20250715_214536_ssid-next_test
+fail_log_20250713_101155.txt                           wifi_test_20250715_214734_ssid-next_test
+fail_log_20250713_101353.txt                           wifi_test_20250715_214931_ssid-next_test
+fail_log_20250713_101550.txt                           wifi_test_20250715_215128_ssid-next_test
