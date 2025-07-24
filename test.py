@@ -1,312 +1,475 @@
-import subprocess
-import json
-import time
-import sys
 import argparse
+import time
 import os
+import pandas as pd
+import threading
+import subprocess
+import yaml
+from datetime import datetime
+import subprocess
+import paramiko
+import sys
+import warnings
 
-# 전역 변수 초기화
-return_data = ""
-reload_return_data = ""  # [ADDED] 드라이버 리로드 후 결과 저장
-current_time =""
+# 상수 정의
+CHECK_INTERVAL = 1  # 1초마다 체크
+SSH_TIMEOUT = 30
+SSH_PROMPT = r'\[root@webOSNano-unofficial ~\]#'
+EXCEL_FILE = 'local_file.xlsx'
 
-def log(message):
-    if args.debug:
-        print(f"[log] {message}")
+# 현재 행 인덱스를 저장할 변수
+current_row_index = 0
+connection_status = False  # 연결 상태를 저장할 변수
+lock = threading.Lock()  # 스레드 안전을 위한 락
 
-def reload_driver(log_dir):
-   log("[driver] Reloading WiFi driver...")
-   env = os.environ.copy()
-   env["PATH"] += os.pathsep + "/sbin"
-   commands = [
-       '/usr/etc/normalmode.sh'
-   ]
-   output_log = []
-   for cmd in commands:
-       result = subprocess.run(cmd, shell=True, env=env, capture_output=True, text=True)
-       output_log.append(f"$ {cmd}\n{result.stdout}{result.stderr}\n")
-       # sleep between certain commands
-      
-   # 저장
-
-   with open(os.path.join(log_dir, "reload_driver_output.log"), "w") as f:
-        f.write("\n".join(output_log))
-
-def get_wifi_profiles():
-    # WiFi 프로파일 목록을 가져오는 명령어 실행
-    result = subprocess.run(['luna-send', '-n', '1', '-f', 'luna://com.webos.service.wifi/getprofilelist', '{}'], capture_output=True, text=True)
-    data = json.loads(result.stdout)
-    if data.get("returnValue"):
-        return data
-    else:
-        log("Failed to retrieve WiFi profiles")
-        return None
-
-def delete_wifi_profile(profile_id):
-    # 특정 프로파일을 삭제하는 명령어 실행
-    result = subprocess.run(['luna-send', '-n', '1', '-f', 'luna://com.webos.service.wifi/deleteprofile', json.dumps({"profileId": profile_id})], capture_output=True, text=True)
-    data = json.loads(result.stdout)
-    if data.get("returnValue"):
-        log(f"Successfully deleted profile with ID {profile_id}")
-        return True
-    else:
-        log(f"Failed to delete profile with ID {profile_id}")
+def find_next_row_index():
+    """Find the next row index where 'Check' is empty or 'X'."""
+    global current_row_index
+    try:
+        df = pd.read_excel(EXCEL_FILE)
+        for index, row in df.iterrows():
+            if pd.isna(row['Check']) or row['Check'] == 'X':
+                current_row_index = index
+                return True
+        print("[x] No available rows found.")
+        return False
+    except Exception as e:
+        print(f"[x] Failed to find next row index: {e}")
         return False
 
-def connect_to_network(ssid, passKey, max_retries=3):
-    global return_data  # 전역 변수 사용을 명시적으로 선언
-    return_data = ""  # 초기화
-    start_time = time.time()
-    for attempt in range(1, max_retries + 1):
-        print(f"[WIFI] Attempt {attempt} to connect to SSID '{ssid}'...")
 
-        connect_command = [
-            "luna-send", "-n", "1", "-f", "luna://com.webos.service.wifi/connect",
-            json.dumps({
-                "ssid": ssid,
-                "security": {
-                    "securityType": "psk",
-                    "simpleSecurity": {
-                        "passKey": passKey
-                    }
-                }
-            })
-        ]
+def check_ssh_connection(host, username, password="allnewb2b^^"):
+    print(f"[...] Checking SSH connection to {host} as {username}")
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname=host, username=username, password=password, timeout=10)
+        client.close()
+        print("[v] SSH Connection OK")
+        return True
+    except Exception as e:
+        print(f"[x] SSH Connection FAIL")
+        return False
 
-        result = subprocess.run(connect_command, capture_output=True, text=True)
-        data = json.loads(result.stdout)
-        return_data += json.dumps(data, indent=2) + "\n"  # 누적
+
+def read_sn_mac_from_file():
+    """엑셀 파일에서 SN과 MAC 주소를 읽습니다."""
+    try:
+        df = pd.read_excel(EXCEL_FILE)
+        if df.empty or current_row_index >= len(df):
+            print("[x] Excel FAIL (No more rows to read)")
+            return False, None, None
         
-        if data.get("returnValue"):
-            print(f"[WIFI] SUCCESS: Connected to SSID '{ssid} after {attempt} to try'")
+        serial_number = df.at[current_row_index, 'Serial Number']
+        mac_address = df.at[current_row_index, 'Eth Address']
+        serial_number = str(serial_number).strip()
+        mac_address = str(mac_address).strip()
+        return True, serial_number, mac_address
+    except Exception as e:
+        print(f"[x] Excel read FAIL ({e})")
+        return False, None, None
+
+
+def execute_ssh_command(host, username, command, password="allnewb2b^^"):
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname=host, username=username, password=password, timeout=10)
+        stdin, stdout, stderr = client.exec_command(command)
+        output = stdout.read().decode().strip()
+        client.close()
+        return output
+    except Exception as e:
+        print(f"[x] SSH execute command error: {e}")
+        return None
+
+def write_sn_mac_to_board(sn, mac, host, username, password="allnewb2b^^"):
+    print(f"[...] Writing SN ({sn}) and MAC ({mac}) to board {host}")
+    write_command = f"echo {sn} > /persist/serial_number && /usr/bin/misc-util ETH_MAC {mac} && echo PACPIA000.AKM > /persist/model_number"
+    check_command = "cat /persist/serial_number && /usr/bin/misc-util ETH_MAC && cat /persist/model_number"
+    execute_ssh_command(host, username, write_command, password)
+    stdout = execute_ssh_command(host, username, check_command, password)
+    if stdout:
+        lines = stdout.split("\n")
+        written_sn = lines[0].strip()
+        written_mac = lines[1].strip() if len(lines) > 1 else None
+        written_model = lines[2].strip() if len(lines) > 2 else None
+        if written_sn == sn and written_mac == mac and written_model == "PACPIA000.AKM":
+            print("[v] Serial Number write OK")
+            print("[v] Eth MAC Addr write OK")
+            print("[v] Model Number write OK")
             return True
         else:
-            print(f"[WIFI]: Could not connect on attempt {attempt}")
-            time.sleep(2) 
-
-    print(f"[WIFI] FAIL: Failed to connect to SSID '{ssid}' after {max_retries} attempts.")
-    flag_file = "/lg_rw/fct_test/wlan0_test_fail.flag"
-    with open(flag_file, "w") as f:
-        f.write("1")
- 
-        current_time = time.strftime('%Y%m%d_%H%M%S')  # [MODIFIED]
-        log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid.replace(' ', '_')}"  # [ADDED]
-        os.makedirs(log_dir, exist_ok=True)  # [ADDED]
-        # connect 결과 저장
-        with open(f"{log_dir}/connect.json", "w") as f:  # [ADDED]
-            f.write(return_data)
-        # journalctl 로그 저장
-        subprocess.run(f'journalctl > {log_dir}/journalctl.log', shell=True)  # [MODIFIED]
-        # dmesg 로그 저장
-        subprocess.run(f'dmesg > {log_dir}/dmesg.log', shell=True)  # [MODIFIED]
-        time.sleep(2)
+            print("[x] Serial Number or MAC write FAIL")
+            print("Intended ------------------------- actual")
+            print(f"Serial number : {sn} ------------ {written_sn}")
+            print(f"eth mac address : {mac} -------- {written_mac}")
+            print(f"Model Number : PACPIA000.AKM ---- {written_model}")
+            return False
     return False
- 
-def ping_test(targetIp):
-    ping_command = ["ping", "-I", "wlan0", "-c", "4", targetIp]
-    result = subprocess.run(ping_command, capture_output=True, text=True)
-    if result.returncode == 0:
-        log("ping OK")
-        print("[WIFI] OK")
-    else:
-        print("[WIFI] FAIL (Ping test failed)")
 
-def find_network(ssid_to_find, min_signal, max_signal, passKey, targetIp):
-    global current_time
-    global return_data  # 전역 변수 사용을 명시적으로 선언
-    global reload_return_data
-    driver_reload_needed = False  # [ADDED] 드라이버 리로드 필요 여부 플래그
-    return_data = ""  # 초기화
-    start_time = time.time()
-    while True:
-        if time.time() - start_time > 60:
-           # flag 파일 생성
-           flag_file = "/lg_rw/fct_test/wlan0_test_fail.flag"
-           with open(flag_file, "w") as f:
-               f.write("1")
-
-           log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid_to_find.replace(' ', '_')}"  # [ADDED]
-           os.makedirs(log_dir, exist_ok=True)  # [ADDED]
-           # findnetworks 결과 저장
-           with open(f"{log_dir}/findnetworks.json", "w") as f:  # [ADDED]
-               f.write(return_data)
-           # journalctl 로그 저장
-           subprocess.run(f'journalctl > {log_dir}/journalctl.log', shell=True)  # [MODIFIED]
-           # dmesg 로그 저장
-           subprocess.run(f'dmesg > {log_dir}/dmesg.log', shell=True)  # [MODIFIED]
-           # ifconfig 결과 저장
-           subprocess.run(
-               f"/sbin/ifconfig -a wlan0 2>&1 | /usr/bin/awk '/HWaddr/ {{print $5}}' > {log_dir}/ifconfig.txt",
-               shell=True
-           )  # [MODIFIED]
-           # 요약 결과 저장
-           with open(f"{log_dir}/summary.txt", "w") as f:  # [ADDED]
-               f.write(f"SSID: {ssid_to_find}\n")
-               f.write(f"Signal: {signal if 'signal' in locals() else 'N/A'}\n")
-               f.write(f"Driver Reloaded: {'Yes' if driver_reload_needed else 'No'}\n")  # [ADDED]
-               f.write("Result: FAIL (Timeout or Signal out of range)\n")
-           # 마스터 요약 로그에 한 줄 추가
-           with open("/lg_rw/fct_test/test_summary_index.log", "a") as f:  # [ADDED]
-               f.write(f"[{current_time}] SSID: {ssid_to_find} - FAIL\n")
-           print("[WIFI] FAIL (Timeout)")
-           return
+def update_check_column():
+    """엑셀 파일의 'Check' 열을 업데이트합니다."""
+    global current_row_index
+    try:
+        df = pd.read_excel(EXCEL_FILE, dtype={'Check': str})
+        if df.empty:
+            print("[v] Execl Check FAIL (Empty)")
+            return False
         
-        # Execute the luna-send command
-        result = subprocess.run(
-            ["luna-send", "-n", "1", "-f", "luna://com.webos.service.wifi/findnetworks", "{}"],
-            capture_output=True,
-            text=True
-        )
+        df.at[current_row_index, 'Check'] = 'O'
+        df.to_excel(EXCEL_FILE, index=False)
+        print("[v] Execl Check OK")
+        return True
+    except Exception as e:
+
+        print(f"[v] Execl Check FAIL ({e})")
+        return False
+
+"""
+def start_fct_test(hostIp):
+    ssh_command = f"ssh -o StrictHostKeyChecking=no root@{hostIp} python3 /lg_rw/fct_test/test_start_dq1.py "
+    
+    try:
+        child = pexpect.spawn(ssh_command)
+        child.interact()
+
+    except Exception as e:
+        print(f"Err: {e}")
+
+"""
+
+
+def board_reboot(hostIp, username, password="allnewb2b^^"):
+    print(f"[...] Rebooting board {hostIp}")
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname=hostIp, username=username, password=password, timeout=10)
         
-        # Parse the JSON output
-        data = json.loads(result.stdout)
-        return_data += json.dumps(data, indent=2) + "\n"  # 누적
+        # Reboot command with sudo
+        print(f"[...] Executing reboot command ...")
+        stdin, stdout, stderr = client.exec_command("/sbin/reboot")
         
-        # [ADDED] 에러코드 5 처리 (WiFi 기술 사용 불가)
-        if data.get("errorCode") == 5 and data.get("errorText") == "WiFi technology unavailable":
-           log("[driver] WiFi technology unavailable - reloading driver...")
-           log_dir = f"/lg_rw/fct_test/wifi_test_{current_time}_ssid-{ssid_to_find.replace(' ', '_')}"
-           os.makedirs(log_dir, exist_ok=True)
-           reload_driver(log_dir=log_dir)  # 로그 저장용 디렉토리 전달
-           driver_reload_needed = True
-           # 재시도
-           retry_result = subprocess.run(
-               ["luna-send", "-n", "1", "-f", "luna://com.webos.service.wifi/findnetworks", "{}"],
-               capture_output=True, text=True
-           )
-           retry_data = json.loads(retry_result.stdout)
-           reload_return_data += json.dumps(retry_data, indent=2) + "\n"
-           with open(os.path.join(log_dir, "reload_driver.json"), "w") as f:
-               f.write(reload_return_data)
-           # [추가] 여전히 실패면 normalmode.sh 실행
-           if retry_data.get("errorCode") == 5:
-               log("[driver] reload_driver 실패 → normalmode.sh 실행")
-               normalmode_result = subprocess.run(
-                   ['/usr/etc/normalmode.sh'],
-                   capture_output=True, text=True
-               )
-               with open(os.path.join(log_dir, "normalmode_output.log"), "w") as f:
-                   f.write(normalmode_result.stdout + "\n" + normalmode_result.stderr)
-               # normalmode 후 findnetwork 재시도
-               normal_retry = subprocess.run(
-                   ["luna-send", "-n", "1", "-f", "luna://com.webos.service.wifi/findnetworks", "{}"],
-                   capture_output=True, text=True
-               )
-               try:
-                   normal_data = json.loads(normal_retry.stdout)
-               except:
-                   normal_data = {"parseError": normal_retry.stdout}
-               with open(os.path.join(log_dir, "normalmode_result.json"), "w") as f:
-                   f.write(json.dumps(normal_data, indent=2))
-               # 이후에도 실패면 로그 출력만 하고 종료
-               if not normal_data.get("returnValue"):
-                   print("[WIFI] FAIL (After normalmode)")
-                   return
-               else:
-                   data = normal_data
-
+        # Read stderr for any error messages
+        error_output = stderr.read().decode().strip()
+        if error_output:
+            print(f"[x] Error during reboot: {error_output}")
         
-        if data.get("returnValue"):
-            networks = data.get("foundNetworks", [])
-
-            # {
-            # "subscribed": false,
-            # "returnValue": true,
-            # "foundNetworks": []
-            # }
-
-            # have to check foundNetworks '[]'
-            if not networks:
-                print("[WIFI] FAIL (No networks found)")
-                with open(os.path.join(log_dir, "findNetwork_result.json"), "w") as f:
-                    f.write(json.dumps(normal_data, indent=2))
-                # journalctl 로그 저장
-                subprocess.run(f'journalctl > {log_dir}/empty_findNetwork_journalctl.log', shell=True)  # [MODIFIED]
-                # dmesg 로그 저장
-                subprocess.run(f'dmesg > {log_dir}/empty_findNetwork_dmesg.log', shell=True)  # [MODIFIED]
-
-            # this is code for bssi print
-            for network in networks:
-                network_info = network.get("networkInfo", {})
-
-                bss_info = network_info.get("bssInfo", [])
-                
-                if bss_info:
-                    ssid = network_info.get("ssid")
-                    print(f"{ssid} -> {bss_info}")
-                    
-                else:
-                    print("[WIFI] FAIL (No BSS info available for the network)")
-                    return
-            # this is connection code
-            for network in networks:
-                network_info = network.get("networkInfo", {})
-
-                bss_info = network_info.get("bssInfo", [])
-
-                if bss_info:
-                    ssid = network_info.get("ssid")
-                    # print(f"{ssid} -> {bss_info}")
-                    
-                    if ssid == ssid_to_find:
-                        if connect_to_network(ssid_to_find, passKey):
-                            ping_test(targetIp)
-                            return
-                else:
-                    print("[WIFI] FAIL (No BSS info available for the network)")
-                    return
-
+        # Wait for the command to complete
+        exit_status = stdout.channel.recv_exit_status()
+        
+        if exit_status == 0:
+            print("[v] Board rebooted successfully")
+            return True
         else:
-            print("[WIFI] FAIL (Failed to find networks)")
+            print(f"[x] Board reboot failed with exit status {exit_status}")
+            return False
+    except paramiko.AuthenticationException:
+        print(f"[x] Authentication failed for user {username}")
+    except paramiko.SSHException as ssh_ex:
+        print(f"[x] SSH connection error: {ssh_ex}")
+    except Exception as e:
+        print(f"[x] Board reboot error: {e}")
+    finally:
+        client.close()  # Ensure the SSH connection is closed
         
-        time.sleep(5)
+    return False
+
+
+def start_fct_test(hostIp, username, password="allnewb2b^^"):
+   print("[...] Starting FCT Test")
+   try:
+       client = paramiko.SSHClient()
+       client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       client.connect(hostname=hostIp, username=username, password=password, timeout=10)
+       transport = client.get_transport()
+       if not transport or not transport.is_active():
+           print("[x] SSH transport is inactive")
+           return False
+       channel = transport.open_session()
+       channel.get_pty()
+       channel.exec_command("python3 /lg_rw/fct_test/test_start_dq1.py")
+       start_time = time.time()
+       timeout_seconds = 60  # 응답 없는 시간 제한 (초)
+       while True:
+           try:
+               # 출력 수신
+               if channel.recv_ready():
+                   output = channel.recv(1024).decode("utf-8")
+                   sys.stdout.write(output)
+                   sys.stdout.flush()
+                   start_time = time.time()  # 마지막 응답 시간 갱신
+                   low = output.lower()
+                   if 'y/n' in low:
+                       user_input = input('Enter y or n: ')
+                       channel.send(user_input + '\n')
+                   elif 'input serial' in low:
+                       user_input = input()
+                       channel.send(user_input + '\n')
+               # 세션 응답 없음으로 인한 타임아웃 감지
+               if time.time() - start_time > timeout_seconds:
+                   print(f"[x] Timeout: No response for {timeout_seconds} seconds.")
+                   channel.close()
+                   client.close()
+                   return False
+               # 채널이 비정상 종료된 경우
+               if channel.closed and not channel.exit_status_ready():
+                   print("[x] Channel closed unexpectedly")
+                   client.close()
+                   return False
+               # 채널 종료 조건
+               if channel.exit_status_ready():
+                   break
+               time.sleep(0.2)
+           except Exception as e:
+               print(f"[x] Exception in FCT loop: {e}")
+               channel.close()
+               client.close()
+               return False
+       exit_status = channel.recv_exit_status()
+       channel.close()
+       client.close()
+       if exit_status == 0:
+           print("[v] FCT Test Completed")
+           return True
+       else:
+           print(f"[x] FCT Test failed with exit status {exit_status}")
+           return False
+   except Exception as e:
+       print(f"[x] SSH connection or setup error: {e}")
+       return False
+
+def remove_known_host(known_hosts_path, hostIp):
+    if os.path.exists(known_hosts_path):
+        with open(known_hosts_path, 'r') as file:
+            known_hosts = file.readlines()
+        
+        # 호스트가 known_hosts에 존재하는지 확인
+        host_found = any(hostIp in line for line in known_hosts)
+        
+        if host_found:
+            print(f"[log] Removing {hostIp} from known_hosts...")
+            subprocess.run(f"ssh-keygen -R {hostIp}", shell=True)
+        return True
+        
+    else:
+        print(f"[log] {known_hosts_path} does not exist.")
+        return True
+
+
+
+def send_time_now(username, hostIp, password="allnewb2b^^"):
+    now = datetime.now()
+    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[...] Sending current time ({current_time}) to {hostIp}")
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname=hostIp, username=username, password=password)
+        cmd_write = f"echo '{current_time}' > /home/root/current_time"
+        cmd_read = "cat /home/root/current_time"
+        client.exec_command(cmd_write)
+        time.sleep(0.5)
+        stdin, stdout, stderr = client.exec_command(cmd_read)
+        read_time = stdout.read().decode().strip()
+        client.close()
+        if read_time == current_time:
+            print("[v] Time write OK")
+            return True
+        else:
+            print("[x] Time write FAIL")
+            return False
+    except Exception as e:
+        print(f"[x] Time write error: {e}")
+        return False
+
+
+
+def write_cfg_to_board(new_mac, new_serial, hostIp, username, password="allnewb2b^^"):
+    """보드에 새로운 cfg.yml 파일을 생성하고 전송"""
+    print(f"[...] Writing cfg.yml with MAC: {new_mac}, Serial: {new_serial} to {hostIp}")
+
+    # 현재 디렉토리에서 cfg.yml 파일 읽기
+    with open('new_cfg.yml', 'r') as file:
+        cfg_data = yaml.safe_load(file)  # YAML 파일을 파싱
+
+    # MAC 주소와 Serial 번호 수정
+    cfg_data['ETH']['mac'] = new_mac
+    cfg_data['VERSION']['serial'] = new_serial
+
+    # 수정된 내용을 다시 YAML 형식으로 저장
+    with open('new_cfg.yml', 'w') as file:
+        yaml.dump(cfg_data, file)
+
+    # SSH 연결 및 파일 전송
+    try:
+        print("[*] Establishing SSH connection")
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname=hostIp, username=username, password=password)
+        print("[*] SSH connection established")
+
+        # 파일 내용을 읽어와서 원격 서버에 cat 명령어로 기록
+        with open('new_cfg.yml', 'rb') as file:
+            file_content = file.read()
+            command = f"cat > /lg_rw/fct_test/cfg.yml"
+            stdin, stdout, stderr = client.exec_command(command)
+            stdin.write(file_content)
+            stdin.close()
+
+        print("[v] cfg write OK")  # 성공 메시지 출력
+        client.close()
+        return True
+
+    except paramiko.SSHException as ssh_error:
+        print(f"[x] SSH error: {ssh_error}")
+    except Exception as e:
+        print(f"[x] cfg write FAIL ({e})")
+    
+    return False
+
+def write_pc_launcher_to_board(launcher, hostIp, username, password="allnewb2b^^"):
+    """보드에 새로운 index.html, launcher.exe 파일을 전송"""
+    print(f"[...] Writing index.html, launcher.exe to {hostIp}")
+
+    # SSH 연결 및 파일 전송
+    try:
+        print("[*] Establishing SSH connection")
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(hostname=hostIp, username=username, password=password)
+        print("[*] SSH connection established")
+
+        # /lg_rw/b2b-platform/http 디렉토리 생성
+        client.exec_command("mkdir -p /lg_rw/b2b-platform/http")
+
+        # index.html 파일 전송
+        with open("index.html", 'rb') as file:
+            file_content = file.read()
+            command = f"cat > /lg_rw/b2b-platform/http/index.html"
+            stdin, stdout, stderr = client.exec_command(command)
+            stdin.write(file_content)
+            stdin.close()
+
+        # launcher.exe 파일 전송
+        with open(launcher, 'rb') as file:
+            file_content = file.read()
+            command = f"cat > /lg_rw/b2b-platform/http/launcher.exe"
+            stdin, stdout, stderr = client.exec_command(command)
+            stdin.write(file_content)
+            stdin.close()
+
+        print("[v] index.html, launcher.exe write OK")  # 성공 메시지 출력
+        client.close()
+        return True
+    except paramiko.SSHException as ssh_error:
+        print(f"[x] SSH error: {ssh_error}")
+    except Exception as e:
+        print(f"[x] index.html, launcher.exe write FAIL ({e})")
+    return False
+
+def main(hostIp, username):
+    
+    while True:
+        # print("*********** Do you want to start FCT ? ***********")
+        # user_input = input(" Please answer (y/n): ").strip().lower()
+        # if user_input == 'y':
+        # known host 삭제
+        known_hosts_path = os.path.expanduser("~/.ssh/known_hosts")
+        if not remove_known_host(known_hosts_path, hostIp):
+            break
+        # Find the next row index to start processing
+        if not args.spec and not find_next_row_index():
+            break
+        
+        while True:
+            if not check_ssh_connection(hostIp, username):
+                print("[*] Wait 10 Seconds and Retry..")
+                time.sleep(10)
+                continue
+
+            print("==================Connection OK========================")
+            # --spec 플래그가 활성화된 경우 아래 코드 블록을 건너뜁니다.
+            if not args.spec:
+                read_result, sn, mac = read_sn_mac_from_file()
+                if not read_result:
+                    print("[x] Excel read FAIL")
+                    break
+
+                print(f"[Serial Number] {sn}\n[ MAC Address ] {mac}")
+                # 맥주소 00:1A:2B:3C:4D:5F 되어있을 경우 : 지우기
+                mac = mac.replace(":", "")
+
+                if not write_sn_mac_to_board(sn, mac, hostIp, username, "allnewb2b^^"):
+                    print("[x] Write SN or MAC FAIL")
+                    break
+
+                # column date
+                if not update_check_column():
+                    print("[x] Excel Check FAIL")
+                    break
+                # index.html, launcher.exe 파일 전송
+                if not write_pc_launcher_to_board("launcher.exe", hostIp, username):
+                    print("[x] index.html, launcher.exe write FAIL")
+                    break
+            else:
+                # --spec 플래그가 활성화된 경우 기본 MAC 주소 설정
+                mac = "00:00:00:00:00:00"  # 기본 MAC 주소를 설정합니다.
+                sn = "DEFAULT_SN"  # 기본 Serial Number를 설정합니다.
+            # cfg 파일 전송
+            if not write_cfg_to_board(mac, sn, hostIp, username):
+                print("[x] cfg write FAIL")
+                break
+
+
+            if not send_time_now(username, hostIp):
+                print("[x] Time write FAIL")
+                break
+
+            # fct 시작
+            if start_fct_test(hostIp, username):
+                print("[v] FCT OK")
+
+            # board_reboot(hostIp, username)
+            print("[v] Board reboot OK")
+            if not args.spec:
+                print("================== Please replace the board for the next test ==================")
+                time.sleep(20)            
+                break
+            # time.sleep(30)    
+    # elif user_input == 'n':
+    #     print("[v] Exit program")
+    #     break
+    # else:
+    #     print("Please Input y or n")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="WiFi network management script.")
-    parser.add_argument('ssid', type=str, help='SSID of the WiFi network to connect to')
-    parser.add_argument('min_signal', type=int, help='Minimum acceptable signal strength')
-    parser.add_argument('max_signal', type=int, help='Maximum acceptable signal strength')
-    parser.add_argument('passKey', type=str, help='Password for the WiFi network')
-    parser.add_argument('targetIp', type=str, help='Target IP address for ping test')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    
+    parser = argparse.ArgumentParser(description='SSH to a remote server and write/read the current time.')
+    parser.add_argument('hostIp', nargs='?', default='192.168.1.101', type=str, help='The IP address of the remote host (default: 192.168.1.100)')
+    parser.add_argument('--spec', action='store_true', help='Enable spec test')
+    warnings.filterwarnings("ignore", category=UserWarning)
+    global args
     args = parser.parse_args()
-    current_time = time.strftime('%Y%m%d_%H%M%S')  # [MODIFIED]
-    
-    profiles = get_wifi_profiles()
-    
-    if profiles:
-        for profile in profiles.get("profileList", []):
-            wifi_profile = profile.get("wifiProfile", {})
-            ssid = wifi_profile.get("ssid")
-            profile_id = wifi_profile.get("profileId")
-            
-            if ssid == args.ssid:
-                log(f"Deleting profile with SSID: {ssid} and Profile ID: {profile_id}")
-                if delete_wifi_profile(profile_id):
-                    log("Deleted OK")
-                break
-    
-    log("Start to find network")
-    find_network(args.ssid, args.min_signal, args.max_signal, args.passKey, args.targetIp)
-    
-    # 마지막에 프로필 삭제 로직 추가
-    if profiles:
-        for profile in profiles.get("profileList", []):
-            wifi_profile = profile.get("wifiProfile", {})
-            ssid = wifi_profile.get("ssid")
-            profile_id = wifi_profile.get("profileId")
-            
-            if ssid == args.ssid:
-                log(f"Deleting profile with SSID: {ssid} and Profile ID: {profile_id} after connection")
-                delete_wifi_profile(profile_id)
-                break
+    hostIp = args.hostIp
+    username = 'root'
+    main(hostIp, username)
 
 
+이 코드에서
 
-1.remove code driver load, keep code run normalmode
-2. normalmode.sh 실행 전의 dmesg and journal log 
-3. normalmode.sh 실행 후의 dmesg and journal log 
-3. Run API findnetwork in 60 second and print value output of run API to a json file (for make sure issue scan fail can reporduce)
+Traceback (most recent call last):                                          module>      
+  File "E:\Wifi\nano\Tool4\fct_test\TEST_on_off_reboot_1.py", line 456, in <module>
+    main(hostIp, username)                                                  ain
+    ~~~~^^^^^^^^^^^^^^^^^^
+  File "E:\Wifi\nano\Tool4\fct_test\TEST_on_off_reboot_1.py", line 421, in main                                                                         rite_cfg_to_b
+    if not write_cfg_to_board(mac, sn, hostIp, username):
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\Wifi\nano\Tool4\fct_test\TEST_on_off_reboot_1.py", line 298, in write_cfg_to_board
+    cfg_data['ETH']['mac'] = new_mac
+    ~~~~~~~~^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
 
+가끔아래와 같이 오류가 나면서 종료가돼. 
 
+나는 spec 모드로 실행을 하고 있긴해
