@@ -1,39 +1,38 @@
-minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ xrandr
-Screen 0: minimum 16 x 16, current 1920 x 1080, maximum 32767 x 32767
-None-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis) 508mm x 285mm
-   1920x1080     59.96*+
-   1440x1080     59.99  
-   1400x1050     59.98  
-   1280x1024     59.89  
-   1280x960      59.94  
-   1152x864      59.96  
-   1024x768      59.92  
-   800x600       59.86  
-   640x480       59.38  
-   320x240       59.52  
-   1680x1050     59.95  
-   1440x900      59.89  
-   1280x800      59.81  
-   1152x720      59.97  
-   960x600       59.63  
-   928x580       59.88  
-   800x500       59.50  
-   768x480       59.90  
-   720x480       59.71  
-   640x400       59.95  
-   320x200       58.96  
-   1600x900      59.95  
-   1368x768      59.88  
-   1280x720      59.86  
-   1024x576      59.90  
-   864x486       59.92  
-   720x400       59.55  
-   640x350       59.77 
-minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ nvidia-smi
-NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.
-
-
-
-   minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ mv ~/.config/monitors.xml ~/.config/monitors.xml.backup reboot
-mv: target 'reboot': No such file or directory
-
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ sudo ubuntu-drivers devices
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+udevadm hwdb is deprecated. Use systemd-hwdb instead.
+== /sys/devices/pci0000:46/0000:46:01.0/0000:47:00.0 ==
+modalias : pci:v000010DEd000024B0sv0000103Csd000014ADbc03sc00i00
+vendor   : NVIDIA Corporation
+model    : GA104GL [RTX A4000]
+driver   : nvidia-driver-550 - distro non-free
+driver   : nvidia-driver-470-server - distro non-free
+driver   : nvidia-driver-570 - distro non-free
+driver   : nvidia-driver-470 - distro non-free
+driver   : nvidia-driver-535-server - distro non-free
+driver   : nvidia-driver-570-server - distro non-free
+driver   : nvidia-driver-575-server - distro non-free
+driver   : nvidia-driver-570-server-open - distro non-free
+driver   : nvidia-driver-575-server-open - distro non-free
+driver   : nvidia-driver-570-open - distro non-free
+driver   : nvidia-driver-575 - distro non-free recommended
+driver   : nvidia-driver-535-server-open - distro non-free
+driver   : nvidia-driver-575-open - distro non-free
+driver   : nvidia-driver-535 - distro non-free
+driver   : nvidia-driver-550-open - distro non-free
+driver   : nvidia-driver-535-open - distro non-free
+driver   : xserver-xorg-video-nouveau - distro free builtin
