@@ -29,3 +29,11 @@ None-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis
    864x486       59.92  
    720x400       59.55  
    640x350       59.77 
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ nvidia-smi
+NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.
+
+
+
+   minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~$ mv ~/.config/monitors.xml ~/.config/monitors.xml.backup reboot
+mv: target 'reboot': No such file or directory
+
