@@ -67,7 +67,7 @@ for i in range(expansion_count):
     print(f"[Q] {i+1}번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
     label_serial = input().strip()
     usb_log_file_path.append(f"expansion_fct_test_{label_serial}.log")
-    log_file_path.append(f"/lg_rw/fct_test/result/expansion_fct_test_{label_serial}.log")
+    log_file_path.append(f"/lg_rw/fct_test/expansion_fct_test_{label_serial}.log")
 
 
 # 로그 파일에 날짜 기록
@@ -518,7 +518,16 @@ else:
     print("USB device not found.")
 
 
-/dev/sda1 is already mounted on /lg_rw/fct_test/result
-Attempt 1: Failed to copy log file to USB: '/lg_rw/fct_test/result/expansion_fct_test_88.log' and '/lg_rw/fct_test/result/expansion_fct_test_88.log' are the same file
 
-왜 이런 문제가 나는거지
+이거를 실행 시키면, 지금 expansion-count 가 2라서 2번 테스트하고     2번 usb 에 기록되길 원하는 때 첫번째만 usb 에 기록되고
+Log file copied to USB: /lg_rw/fct_test/result/expansion_fct_test_999.log
+Log file copied to USB: /lg_rw/fct_test/result/expansion_fct_test_000.log
+umount: /lg_rw/fct_test/result: not mounted.
+Attempt 1: Failed to unmount USB device: Command 'umount /lg_rw/fct_test/result' returned non-zero exit status 32.
+umount: /lg_rw/fct_test/result: not mounted.
+Attempt 2: Failed to unmount USB device: Command 'umount /lg_rw/fct_test/result' returned non-zero exit status 32.
+umount: /lg_rw/fct_test/result: not mounted.
+Attempt 3: Failed to unmount USB device: Command 'umount /lg_rw/fct_test/result' returned non-zero exit status 32.
+Failed to unmount USB device.
+
+이런 오류가 떠
