@@ -56,29 +56,25 @@ def get_wired_addr():
 eth_mac = get_wired_addr()
 
 
-check1 = config['USB'].get('uart-1', False)
-check2 = config['USB'].get('uart-2', False)
+expansion_count = config['USB'].get('expansion-count', False)
 
 # 로그 파일 설정
-log_file_path = config.get('global', {}).get('log_file_path', '/lg_rw/fct_test/expansion_fct_test.log')
 
-if check1:
+usb_log_file_path = []
+log_file_path = []
 
-    print("[Q] 1번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
-    label_serial1 = input().strip()          ### CHANGED
-    usb_log_file_path = f"expansion_fct_test_{label_serial1}.log"
-if check2:
-    print("[Q] 1번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
-    label_serial1 = input().strip()          ### CHANGED
-    usb_log_file_path = f"expansion_fct_test_{label_serial1}.log"
-    print("[Q] 2번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
-    label_serial2 = input().strip()   
-    usb_log_file_path = f"expansion_fct_test_{label_serial1}_{label_serial2}.log"
+for i in range(expansion_count):
+    label_serial = input().strip()
+    usb_log_file_path.append(f"expansion_fct_test_{label_serial}.log")
+    log_file_path.append(f"/lg_rw/fct_test/result/expansion_fct_test_{label_serial}.log")
+
 
 # 로그 파일에 날짜 기록
-with open(log_file_path, 'a') as log_file:
-    log_file.write("###############################################################\n")
-    log_file.write(f"Test started at: {log_datetime}\n")
+
+for file in log_file_path:
+    with open(log_file_path, 'a') as log_file:
+        log_file.write("###############################################################\n")
+        log_file.write(f"Test started at: {log_datetime}\n")
 
 # 테스트 항목, 스크립트, 순서
 test_items = {
@@ -544,16 +540,48 @@ if device_name:
     mount_point = mount_usb(device_name, "/lg_rw/fct_test/result")
     if mount_point:
         # 로그 파일 경로 생성
-        usb_full_log_path = os.path.join(mount_point, usb_log_file_path)
+        for expansion_file in usb_log_file_path:
+            # 각 확장 장치에 대해 로그 파일 경로 설정
+            log_file_name = f"{eth_mac}_{expansion_file}"
+            log_file_path = os.path.join(config['USB']['file_path'], log_file_name)
+            print(f"Log file path: {log_file_path}")
+            usb_full_log_path = os.path.join(mount_point, usb_log_file_path)
 
-        # 로그 파일을 USB로 복사 및 검증
-        if copy_log_file(log_file_path, usb_full_log_path):
-            # USB 장치 언마운트
-            if not unmount_usb(mount_point):
-                print("Failed to unmount USB device.")
-        else:
-            print("Failed to copy and verify log file to USB.")
+            # 로그 파일을 USB로 복사 및 검증
+            if copy_log_file(log_file_path, usb_full_log_path):
+                # USB 장치 언마운트
+                if not unmount_usb(mount_point):
+                    print("Failed to unmount USB device.")
+            else:
+                print("Failed to copy and verify log file to USB.")
     else:
         print("Failed to mount USB device")
 else:
     print("USB device not found.")
+
+
+
+
+내가
+
+expansion_count = config['USB'].get('expansion-count', False)
+
+# 로그 파일 설정
+
+usb_log_file_path = []
+log_file_path = []
+
+for i in range(expansion_count):
+    label_serial = input().strip()
+    usb_log_file_path.append(f"expansion_fct_test_{label_serial}.log")
+    log_file_path.append(f"/lg_rw/fct_test/result/expansion_fct_test_{label_serial}.log")
+
+
+# 로그 파일에 날짜 기록
+
+for file in log_file_path:
+    with open(log_file_path, 'a') as log_file:
+        log_file.write("###############################################################\n")
+        log_file.write(f"Test started at: {log_datetime}\n")
+
+이런식으로 파일 여러개 만들도록 수정을 했는데, 각 시리얼 넘버에 맞춘 테스트들이 각각 저장되어야한다면 어떻게 수정되면 좋을까
