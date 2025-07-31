@@ -501,12 +501,12 @@ if device_name:
     mount_point = mount_usb(device_name, "/lg_rw/fct_test/result")
     if mount_point:
         # 로그 파일 경로 생성
-        for expansion_file in usb_log_file_path:
+        for idx, expansion_file in enumerate(usb_log_file_path):
             # 각 확장 장치에 대해 로그 파일 경로 설정
-            usb_full_log_path = os.path.join(mount_point, usb_log_file_path)
+            usb_full_log_path = os.path.join(mount_point, expansion_file)
 
             # 로그 파일을 USB로 복사 및 검증
-            if copy_log_file(expansion_file, usb_full_log_path):
+            if copy_log_file(log_file_path[idx], usb_full_log_path):
                 # USB 장치 언마운트
                 if not unmount_usb(mount_point):
                     print("Failed to unmount USB device.")
@@ -519,14 +519,6 @@ else:
 
 
 /dev/sda1 is already mounted on /lg_rw/fct_test/result
-Traceback (most recent call last):
-  File "/lg_rw/fct_test/test_start_dq1.py", line 506, in <module>
-    usb_full_log_path = os.path.join(mount_point, usb_log_file_path)
-  File "/usr/lib/python3.10/posixpath.py", line 90, in join
-    genericpath._check_arg_types('join', a, *p)
-  File "/usr/lib/python3.10/genericpath.py", line 152, in _check_arg_types
-    raise TypeError(f'{funcname}() argument must be str, bytes, or '
-TypeError: join() argument must be str, bytes, or os.PathLike object, not 'list'
+Attempt 1: Failed to copy log file to USB: '/lg_rw/fct_test/result/expansion_fct_test_88.log' and '/lg_rw/fct_test/result/expansion_fct_test_88.log' are the same file
 
-
-이건 무슨 오류야
+왜 이런 문제가 나는거지
