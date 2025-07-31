@@ -1,40 +1,5 @@
 1. new_cfg.yml 
-"DIO:
-  enable: false
-  order: 6
-  repeat: 1
-ETH:
-  address: 192.168.1.100
-  auto: true
-  enable: false
-  mac: 00:00:00:00:00:00
-  order: 3
-  repeat: 1
-LCD:
-  auto: false
-  enable: false
-  order: 8
-  repeat: 1
-PWM:
-  auto: false
-  enable: false
-  order: 5
-  repeat: 1
-RTC:
-  auto: false
-  enable: false
-  order: 1
-  repeat: 1
-TOUCH:
-  enable: false
-  order: 9
-  repeat: 1
-UART:
-  boadrate: 9600
-  data: 256
-  enable: false
-  order: 7
-  repeat: 1
+...
 USB:
   enable: true
   auto: false
@@ -42,32 +7,6 @@ USB:
   repeat: 1
   uart-1: true
   uart-2: false
-VERSION:
-  app: com.acp.energy,com.acp.softap,com.acp.lgapcomm,com.acp.logics,com.acp.mailer,com.acp.mqttbroker,com.acp.mqttpublisher,com.acp.quickinstall,com.acp.restserver,com.acp.tmsclient,com.acp.trends,com.acp.flat,com.acp.lcd
-  enable: false
-  kernel: 5.15.174-b0-saturn
-  model: PACPIA000.AKM
-  order: 1
-  ram: 1.0.0
-  repeat: 1
-  serial: DEFAULT_SN
-BLUETOOTH:
-  enable: false
-  mac: 0
-  max: 0
-  min: 0
-  order: 0
-  repeat: 1
-WIFI:
-  address: 192.168.2.254
-  enable: false
-  max: -10
-  min: -90
-  name: wlan0
-  order: 4
-  password: 12347890
-  repeat: 1
-  ssid: next_test
 global:
   log_file_path: /lg_rw/expansion_test.log
   parallel: false
