@@ -1,277 +1,359 @@
-fn decode_cmd0(&mut self, bytes: Bytes) -> Result<()> {
-        let mut bytes = bytes;
-        let check_bytes = bytes.clone();
+import os
+import argparse
+import time
+import serial
+import threading
+import shutil
+import subprocess
 
-        let byte0 = bytes.get_u8();
-        let length = byte0 & 0x7F;
-        if length != 16 {
-            return Err(anyhow!("IDU Cmd0 decode: invalid length: {length}"));
-        }
+# 전역 변수로 결과 플래그 저장
+success_flag = True
+failed_tests = []
+lock = threading.Lock()  # Lock 객체 생성
 
-        if bytes.remaining() < length as usize - 1 {
-            return Err(anyhow!("IDU Cmd0 decode: invalid length"));
-        }
+# 이벤트 객체 생성
+master_ready = threading.Event()
+slave_ready = threading.Event()
 
-        let byte1 = bytes.get_u8();
-        let cmd = (byte1 >> 3) & 0x0F;
-        if cmd != 0 {
-            return Err(anyhow!("IDU Cmd0 decode: invalid cmd: {cmd}"));
-        }
+def log(message):
+    if args.debug:
+        print(f"[log] {message}")
 
-        let byte2 = bytes.get_u8();
-        let byte3 = bytes.get_u8();
-        let byte4 = bytes.get_u8();
-        let byte5 = bytes.get_u8();
-        let byte6 = bytes.get_u8();
-        let byte7 = bytes.get_u8();
-        let byte8 = bytes.get_u8();
-        let byte9 = bytes.get_u8();
-        let byte10 = bytes.get_u8();
-        let byte11 = bytes.get_u8();
-        let byte12 = bytes.get_u8();
-        let byte13 = bytes.get_u8();
-        let byte14 = bytes.get_u8();
-        let byte15 = bytes.get_u8();
+def tx_485_test(port, buf_tx):
+    with lock:  # Lock을 사용하여 스레드 동기화
+        num_tx = port.write(buf_tx)  # 데이터 전송
+        if args.debug:
+            print(f"[{port.port}][send] send {num_tx} bytes.")
+    return num_tx
 
-        // byte 15
-        let checksum = byte15;
-        let expected_checksum = {
-            let mut sum: u32 = 0;
-            for byte in check_bytes[0..15].iter() {
-                sum += *byte as u32;
-            }
-            ((sum ^ 0x55) & 0xff) as u8
-        };
+def rx_485_test(port, rx_size):
+    start_time = time.time()
+    buf_rx = bytearray()  # 초기화
+    while True:
+        recved = port.read(rx_size - len(buf_rx))  # 남은 크기만큼 읽기
+        buf_rx += recved
+        if len(buf_rx) >= rx_size:
+            if args.debug:
+                print(f"[{port.port}][recv] Expected {rx_size}, Received {len(buf_rx)}")
+            break
+        if time.time() - start_time > 2:  # 타임아웃
+            if args.debug:
+                print("====== Timeout ======")
+                print(f"[{port.port}][recv] Expected {rx_size}, Received {len(buf_rx)}")
+            break
+    return buf_rx
 
-        if checksum != expected_checksum {
-            return Err(anyhow!(
-                "IDU Cmd0 decode: invalid checksum: {checksum} != {expected_checksum}"
-            ));
-        }
+def slave_thread(rs485_port, tx_buf, rx_buf):
+    global success_flag
+    for j in range(1):  # 반복 횟수를 1로 줄임
+        rs485_port.flushInput()
+        master_ready.wait()  # 마스터가 준비될 때까지 대기
+        rx = rx_485_test(rs485_port, len(rx_buf))
+        if tx_buf != rx:
+            success_flag = False
+            failed_tests.append(f"tty{rs485_port.port[-1]}")
+            if args.debug:
+                print(f"[{j}][{rs485_port.port}][recv]: ", end="")
+                for i in rx:
+                    print(f"{i:d}", end=" ")
+                print("\n\n")
+        rs485_port.flushOutput()
+        time.sleep(0.0015)
+        tx_485_test(rs485_port, tx_buf)
+        slave_ready.set()  # 슬레이브가 데이터를 보냈음을 알림
+        master_ready.clear()  # 마스터가 다시 대기 상태로 설정
 
-        self.connection_checker.reset_disconnect_count();
-        let mut data_sets = DataSets::default();
+def master_thread(rs485_port, tx_buf, rx_buf):
+    global success_flag
+    for j in range(1):  # 반복 횟수를 1로 줄임
+        tx_485_test(rs485_port, tx_buf)
+        master_ready.set()  # 마스터가 데이터를 보냈음을 알림
+        slave_ready.wait()  # 슬레이브가 준비될 때까지 대기
+        rs485_port.flushInput()
+        rx = rx_485_test(rs485_port, len(rx_buf))
+        if tx_buf != rx:
+            success_flag = False
+            failed_tests.append(f"tty{rs485_port.port[-1]}")
+            if args.debug:
+                print(f"[{j}][{rs485_port.port}][recv]: ", end="")
+                for i in rx:
+                    print(f"{i:d}", end=" ")
+                print("\n\n")
+        rs485_port.flushOutput()
+        time.sleep(0.0015)
+        slave_ready.clear()  # 슬레이브가 다시 대기 상태로 설정
 
-        // byte 0
-        let is_master = byte0 >> 7;
-        if is_master != 0 {
-            return Err(anyhow!("IDU Cmd0 decode: invalid is_master"));
-        }
+def try_communicate(port1, port2, baudrate, data_size):
+    if args.debug:
+        print(f"[log] Communicating from {port1} to {port2} and {port2} to {port1}")
+    
+    rs485_port1 = serial.Serial(port=port1, baudrate=baudrate, timeout=0)
+    rs485_port2 = serial.Serial(port=port2, baudrate=baudrate, timeout=0)
 
-        // byte 1
-        let oper = byte1 & 0x01;
-        data_sets.set("oper", oper as f32);
-        let lock = (byte1 >> 2) & 0x01;
-        // TODO: if !self.hardlock 일 때만 값 업데이트
-        data_sets.set("lock", lock as f32);
-        let dot5 = (byte1 >> 7) & 0x01;
+    tx_buf = bytearray([0x11 for _ in range(data_size)])
+    rx_buf = bytearray(data_size)
+    rs485_port1.flushInput()
+    rs485_port1.flushOutput()
+    rs485_port2.flushInput()
+    rs485_port2.flushOutput()
 
-        // byte 2
-        let product_code = byte2;
-        if product_code != 0xA0 && product_code != 0xA3 {
-            return Err(anyhow!(
-                "IDU Cmd0 decode: invalid recv product_code: {product_code}"
-            ));
-        }
-        if product_code == 0xA3 {
-            self.slave_connection_checker.reset_disconnect_count();
-        }
+    # 첫 번째 통신: port1이 master, port2가 slave
+    threads = [
+        threading.Thread(target=master_thread, args=(rs485_port1, tx_buf, rx_buf)),  # port1이 master
+        threading.Thread(target=slave_thread, args=(rs485_port2, tx_buf, rx_buf))    # port2가 slave
+    ]
 
-        // byte 3
-        let product_code = byte3;
-        if product_code <= 0x6F {
-            self.product_code = product_code;
-        } else {
-            return Err(anyhow!(
-                "IDU Cmd0 decode: invalid send product_code: {product_code}"
-            ));
-        }
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
 
-        // byte 4
-        let addr = byte4;
-        if addr != self.addr {
-            return Err(anyhow!("IDU Cmd0 decode: invalid addr: {addr}"));
-        }
+def get_usb_products():
+    products = []
+    for device in os.listdir('/sys/bus/usb/devices/'):
+        try:
+            with open(f'/sys/bus/usb/devices/{device}/product', 'r') as f:
+                product = f.read().strip()
+                products.append(product)
+        except FileNotFoundError:
+            continue
+    return products
 
-        // byte 5
-        let err = byte5;
-        // 백업운전 에러 173은 에러로 표시하지 말 것
-        let err = if err == 173 { 0.0 } else { err as f32 };
+def check_usb_expansion():
+    # USB 포트 체크
+    required_ports = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3']
+    missing_ports = [port for port in required_ports if not os.path.exists(port)]
 
-        data_sets.set("err", err);
-        if err != 0.0 {
-            if let Err(e) =
-                data_manager::facility::set_status(self.id, Status::MiscError(err as i32))
-            {
-                error!("Failed to set status: {e}");
-            }
-        }
+    if missing_ports:
+        log(f"Missing USB ports: {', '.join(missing_ports)}")
+        return False
 
-        // 242 에러가 발생하면, 연결 끊김으로 판단
-        if err == 242.0 {
-            if let Err(e) = self.connection_checker.disconnected() {
-                error!("IDU Cmd0 decode: connection_checker.disconnected error: {e}");
-            }
-        }
+    log("All required USB ports are present.")
+    return True
 
-        // byte 6
-        let mode = byte6 & 0x07;
-        data_sets.set("mode", mode as f32);
-        let fan = (byte6 >> 3) & 0x01;
-        data_sets.set("swing", fan as f32);
-        let fan_speed = (byte6 >> 4) & 0x07;
-        data_sets.set("fan", fan_speed as f32);
-        let _cycle = (byte6 >> 7) & 0x01;
+def check_usb_expansion_all():
+    # USB 포트 체크
+    required_ports = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3', '/dev/ttyUSB4', '/dev/ttyUSB5', '/dev/ttyUSB6', '/dev/ttyUSB7']
+    missing_ports = [port for port in required_ports if not os.path.exists(port)]
 
-        // byte 7
-        let settemp = byte7 & 0x0F;
-        let settemp = settemp as f32 + 15.0 + (dot5 as f32 * 0.5);
-        if mode == 1 /* DRY */ || mode == 2
-        /* FAN */
-        {
-            // DRY, FAN 모드에서는 settemp를 설정하지 않음
-        } else {
-            // ulim, llim 을 확인한다.
-            data_sets.set("settemp", settemp);
-        };
-        let oil = (byte7 >> 4) & 0x01;
-        data_sets.set("oil_alarm", oil as f32);
-        let plasma = (byte7 >> 5) & 0x01;
-        data_sets.set("plasma", plasma as f32);
-        let cmd7 = (byte7 >> 6) & 0x01;
-        self.cmd7_flag = cmd7 == 1;
-        let filter_sign = (byte7 >> 7) & 0x01;
-        data_sets.set("filter", filter_sign as f32);
+    if missing_ports:
+        log(f"Missing USB ports: {', '.join(missing_ports)}")
+        return False
 
-        // Dokit인지 판단한다.
-        // Dokit인 경우 Oper 값만 설정하고 나머지 값은 설정하지 않는다.
-        if byte7 & 0xF0 == 0xF0 {
-            data_table()
-                .write()
-                .set(DeviceType::Dokit, self.address(), "oper", oper as f32)?;
+    log("All required USB ports are present.")
+    return True
+ 
+def check_usb_communication_all(baudrate, data_size):
+    global success_flag
+    try:
+        for i in range(3):
+            try_communicate('/dev/ttyUSB0', '/dev/ttyUSB1', baudrate, data_size)  # 0과 1 간의 통신
+            try_communicate('/dev/ttyUSB2', '/dev/ttyUSB3', baudrate, data_size)  # 2와 3 간의 통신
+            try_communicate('/dev/ttyUSB4', '/dev/ttyUSB5', baudrate, data_size)  # 2와 3 간의 통신
+            try_communicate('/dev/ttyUSB6', '/dev/ttyUSB7', baudrate, data_size)  # 2와 3 간의 통신
+    except Exception as e:
+        success_flag = False
+        failed_tests.append(f"Communication error: {str(e)}")
 
-            return Ok(());
-        }
 
-        // byte 8
-        let roomtemp = byte8;
-        let roomtemp = get_roomtemp(roomtemp as usize)?;
-        let roomtemp = if roomtemp < -99.0 {
-            -99.0
-        } else if roomtemp > 99.0 {
-            99.0
-        } else {
-            roomtemp
-        };
-        data_sets.set("roomtemp", roomtemp);
+def check_usb_communication(baudrate, data_size):
+    global success_flag
+    try:
+        try_communicate('/dev/ttyUSB0', '/dev/ttyUSB1', baudrate, data_size)  # 0과 1 간의 통신
+        try_communicate('/dev/ttyUSB2', '/dev/ttyUSB3', baudrate, data_size)  # 2와 3 간의 통신
+    except Exception as e:
+        success_flag = False
+        failed_tests.append(f"Communication error: {str(e)}")
 
-        // byte 9
-        let pipein_temp = byte9;
-        let pipein_temp = get_pipetemp(pipein_temp)? as f32 / 10.0;
-        data_sets.set("pipe_intemp", pipein_temp as f32);
+def create_test_file(file_path, size_in_mb):
+    try:
+        with open(file_path, 'wb') as f:
+            f.write(os.urandom(size_in_mb * 1024 * 1024))  # 랜덤 데이터로 파일 생성
+        log(f"Test file created: {file_path}")
+    except Exception as e:
+        log(f"Failed to create test file: {e}")
 
-        // byte 10
-        let pipeout_temp = byte10;
-        let pipeout_temp = get_pipetemp(pipeout_temp)? as f32 / 10.0;
-        data_sets.set("pipe_outtemp", pipeout_temp);
+def compare_files(file1, file2):
+    try:
+        with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
+            return f1.read() == f2.read()
+    except Exception as e:
+        log(f"Failed to compare files: {e}")
+        return False
 
-        // byte 11
-        let lev_low_byte = byte11;
+def copy_test_file(src, dst):
+    try:
+        shutil.copy(src, dst)
+        log(f"Test file copied to USB: {dst}")
+        return True
+    except Exception as e:
+        log(f"Failed to copy test file to USB: {e}")
+        return False
 
-        // byte 12
-        let lev_high_byte = byte12;
-        let lev = (lev_high_byte as u16) << 8 | lev_low_byte as u16;
-        data_sets.set("lev", lev as f32);
+def usb_test(mount_point, file_size):
+    global success_flag
+    device_name = find_usb_device()
+    if device_name:
+        mount_usb(device_name, mount_point)
+        test_file_path = os.path.join(mount_point, 'usb_test_file.bin')
+        create_test_file(test_file_path, file_size)
+        copied_file_path = os.path.join(mount_point, 'usb_test_file_copy.bin')
+        if copy_test_file(test_file_path, copied_file_path):
+            if compare_files(test_file_path, copied_file_path):
+                log("USB test file copied and verified successfully.")
+            else:
+                success_flag = False
+                failed_tests.append("Verification failed for the copied file.")
+        unmount_usb(mount_point)
+    else:
+        success_flag = False
+        failed_tests.append("USB device not found.")
 
-        // byte 13
-        let capa = byte13;
-        data_sets.set("capa", capa as f32);
+def find_usb_device():
+    for attempt in range(3):
+        try:
+            lsblk_output = subprocess.run("lsblk -o NAME,FSTYPE", shell=True, capture_output=True, text=True).stdout.strip()
+            if lsblk_output:
+                lines = lsblk_output.splitlines()
+                for line in lines:
+                    parts = line.split()
+                    if len(parts) >= 2 and any(fs in parts[1] for fs in ['vfat', 'fat32', 'exfat']):
+                        device_name = parts[0].strip('`-')
+                        return f"/dev/{device_name}"
+        except Exception as e:
+            log(f"Attempt {attempt + 1}: Failed to find USB device: {e}")
+    return None
 
-        // byte 14
-        let _sum_qj = byte14;
+def is_mounted(device_name, mount_point):
+    try:
+        result = subprocess.run("mount", shell=True, capture_output=True, text=True).stdout.strip()
+        for line in result.splitlines():
+            if device_name in line and mount_point in line:
+                return True
+    except Exception as e:
+        log(f"Failed to check if device is mounted: {e}")
+    return False
 
-        // ACO 로직 처리
-        let aco_enable = config().read().aco_enable;
-        data_sets.set("aco_enable", aco_enable as u8 as f32);
-        let aco_oper = data_sets.get("aco_oper") as u8;
-        if mode == 0 /* COOL */ && aco_oper == 1 && aco_enable {
-            let mut aco_upper = settemp;
+def mount_usb(device_name, mount_point):
+    for attempt in range(3):
+        try:
+            if not os.path.exists(mount_point):
+                os.makedirs(mount_point, exist_ok=True)
+            if is_mounted(device_name, mount_point):
+                log(f"{device_name} is already mounted on {mount_point}")
+                return mount_point
+            subprocess.run(f"mount {device_name} {mount_point}", shell=True, check=True)
+            return mount_point
+        except Exception as e:
+            log(f"Attempt {attempt + 1}: Failed to mount USB device: {e}")
+    return None
 
-            let mut aco_lower = data_sets.get("aco_lower");
-            if aco_upper <= aco_lower {
-                aco_lower = aco_upper - 1.0 /* aco_delta */;
-            }
+def unmount_usb(mount_point):
+    for attempt in range(3):
+        try:
+            subprocess.run(f"umount {mount_point}", shell=True, check=True)
+            return True
+        except Exception as e:
+            log(f"Attempt {attempt + 1}: Failed to unmount USB device: {e}")
+    return False
 
-            if aco_lower < 18.0 {
-                aco_lower = 18.0;
-                aco_upper = aco_lower + 1.0 /* aco_delta */;
-            }
+def check_usb_flag():
+    try:
+        with open('/lg_rw/fct_test/usb_write', 'r') as flag_file:
+            flag_content = flag_file.read().strip()
+            return flag_content == "1"  # 1이면 성공, 0이면 실패
+    except Exception as e:
+        log(f"Failed to read USB flag file: {e}")
+        return False
 
-            data_table()
-                .write()
-                .set(DeviceType::Idu, self.address(), "aco_upper", aco_upper)?;
+def check_led_status():
 
-            data_table()
-                .write()
-                .set(DeviceType::Idu, self.address(), "aco_lower", aco_lower)?;
+    global success_flag
+    """사용자에게 LED 상태를 확인합니다."""
+    print("[Q] 4쌍의 LED가 모두 반짝거렸습니까? (y/n 또는 r로 재시도): ")
+    led_status = input().strip().lower()
 
-            data_table()
-                .write()
-                .flush(DeviceType::Idu, self.address(), None);
-        } else if mode == 4 /* HEAT */ && aco_oper == 1 && aco_enable {
-            let mut aco_lower = settemp;
+    if led_status == 'y':
+        return False
+    elif led_status == 'n':
+        success_flag = False
+    elif led_status == 'r':
+        print("RS485 통신을 다시 수행합니다...")
+        return True  # 재시도 필요
+    else:
+        print("잘못된 입력입니다. y, n 또는 r을 입력하세요.")
+        return False  # 재시도 필요 없음
+    return False  # 재시도 필요 없음
 
-            let mut aco_upper = data_sets.get("aco_upper");
-            if aco_upper <= aco_lower {
-                aco_upper = aco_lower + 1.0 /* aco_delta */;
-            }
+def main():
+    parser = argparse.ArgumentParser(description='USB Expansion Checker and RS-485 Communication')
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--usb-test', action='store_true', help='Perform USB test by writing and verifying a file')
+    parser.add_argument('--check-485', action='store_true', help='Perform RS-485 communication check', default=False)
+    parser.add_argument('--mount-point', default='/lg_rw/fct_test/result', help='Mount point for the USB device')
+    parser.add_argument('--file-size', type=int, default=1, help='Size of the test file in MB')
 
-            if aco_upper > 30.0 {
-                aco_upper = 30.0;
-                aco_lower = aco_upper - 1.0 /* aco_delta */;
-            }
+    global args
+    args = parser.parse_args()
 
-            data_table()
-                .write()
-                .set(DeviceType::Idu, self.address(), "aco_upper", aco_upper)?;
+    #확장 모듈 체크 플래그
+    usb_expansion_success = True
 
-            data_table()
-                .write()
-                .set(DeviceType::Idu, self.address(), "aco_lower", aco_lower)?;
+    # USB 플래그 체크 플래그
+    usb_flag_success = True
 
-            data_table()
-                .write()
-                .flush(DeviceType::Idu, self.address(), None);
-        }
+    # 별도로 앱 다운로드 없이 USB 테스트가 필요한 경우에 수행
+    # only 확장 모듈 USB 포트 체크
+    if args.check_485:
+        # USB 통신 체크
+        usb_expansion_success = check_usb_expansion_all()
 
-        // CMD4에 대한 처리 진행
-        if self.cmd4_flag {
-            let cmd4_data_sets = data_table()
-                .read()
-                .gets(DeviceType::Idu, self.address())
-                .unwrap_or_default();
+        while True:
+            baudrate = 9600  # 예시로 설정한 baudrate
+            data_size = 256   # 예시로 설정한 데이터 크기
+            check_usb_communication_all(baudrate, data_size)
+            # LED 상태 확인
+            if check_led_status():
+                continue
+            else:
+                break
+        
+    elif args.usb_test:
+        usb_test(args.mount_point, args.file_size)
 
-            let cmd4_values = [
-                "settemplock",
-                "fanlock",
-                "modelock",
-                "settemp_llim",
-                "fan_direction",
-                "settemp_ulim",
-            ];
+        usb_expansion_success = check_usb_expansion()
+        if not usb_expansion_success:
+            log("[USB] USB expansion module check failed. Please check the USB ports.")
+            failed_tests.append("Expansion Module")
 
-            for value in cmd4_values.iter() {
-                data_sets.set(value, cmd4_data_sets.get(value));
-            }
+    else: 
+        # USB 플래그 체크
+        usb_flag_success = check_usb_flag()
+        if not usb_flag_success:
+            log("[USB] USB flag check failed. Please check the USB connection.")
+            failed_tests.append("USB Write")
+        usb_expansion_success = check_usb_expansion()
+        if not usb_expansion_success:
+            log("[USB] USB expansion module check failed. Please check the USB ports.")
+            failed_tests.append("Expansion Module")
 
-            self.cmd4_flag = false;
-        }
 
-        data_table()
-            .write()
-            .sets(DeviceType::Idu, self.address(), data_sets)?;
+    # 최종 결과 출력
+    if usb_expansion_success and usb_flag_success and success_flag:
+        print("[USB] OK")
+    else:
+        print(f"[USB] FAIL ({', '.join(failed_tests)})")
 
-        Ok(())
-    }
+if __name__ == "__main__":
+    main()
 
-이 코드에서 settemp 할 때 settemp_llim,settemp_ulim  을 확인하고 상하한을 맞춰야하는데 .. 코드를 어떻게 수정하면 될까
+
+이거는 --check-485 옵션을 주고 실행 시켰을 때, 왜 led 가 깜빡 거렸냐는걸 묻지 않는걸까 
+
+# LED 상태 확인
+            if check_led_status():
+                continue
+            else:
+                break
+
+이 부분이 실행안된늑 것 같아 ?
