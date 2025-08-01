@@ -105,11 +105,11 @@ def write_sn_mac_to_board(sn, mac, ip, user, pwd="allnewb2b^^"):
    ok = (lines[0].strip()==sn and lines[1].strip()==mac and lines[2].strip()=="PACPIA000.AKM")
    log("[v] SN/MAC OK" if ok else "[x] SN/MAC mismatch")
    return ok
-def write_cfg_to_board(mac,sn,ip,user,pwd="allnewb2b^^"):
+def write_cfg_to_board(mac,sn,expansion_count,ip,user,pwd="allnewb2b^^"):
    log("[...] Write cfg.yml")
    try:
        with open("new_cfg.yml") as f: cfg=yaml.safe_load(f)
-       cfg["ETH"]["mac"],cfg["VERSION"]["serial"]=mac,sn
+       cfg["ETH"]["mac"],cfg["VERSION"]["serial"],cfg["USB"]["expansion-count"] = mac,sn,expansion_count  # ★추가★
        with open("new_cfg.yml","w") as f: yaml.dump(cfg,f)
        c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
        c.connect(hostname=ip, username=user, password=pwd)
@@ -185,25 +185,17 @@ def start_fct_test(ip,user,ask_cb,pwd="allnewb2b^^"):
    except Exception as e:
        log(f"[x] FCT err: {e}"); return False
 # ────────── FCT 핵심 흐름 (백그라운드 스레드) ───────────────
-def run_fct(host_ip:str, spec_mode:bool):
+def run_fct(host_ip:str, expansion_count: int):
    username="root"
    try:
        remove_known_host(os.path.expanduser("~/.ssh/known_hosts"), host_ip)
-       if not spec_mode and not find_next_row_index(): return
-       # 연결 대기
+       
        while not check_ssh_connection(host_ip,username):
            log("[*] Retry in 60s"); time.sleep(60)
        log("================ Connection OK ================")
-       if not spec_mode:
-           ok,sn,mac=read_sn_mac_from_file()
-           if not ok: return
-           mac_clean=mac.replace(":","")
-           if not write_sn_mac_to_board(sn,mac_clean,host_ip,username): return
-           if not update_check_column(): return
-           if not write_pc_launcher_to_board(host_ip,username): return
-       else:
-           sn,mac_clean="DEFAULT_SN","00:00:00:00:00:00"
-       if not write_cfg_to_board(mac_clean,sn,host_ip,username): return
+       
+       sn,mac_clean="DEFAULT_SN","00:00:00:00:00:00"
+       if not write_cfg_to_board(mac_clean,sn,expansion_count,host_ip,username): return
        if not send_time_now(host_ip,username): return
        if not start_fct_test(host_ip,username,ask_input): return
        log("[v] ALL OK – replace board")
@@ -242,9 +234,14 @@ cfg=ttk.Frame(root, style="Card.TFrame"); cfg.place(x=20,y=110,width=820,height=
 tk.Label(cfg,text="Host IP",bg="white",fg=LG_DARKTEXT).grid(row=0,column=0,padx=(20,5),pady=15,sticky="e")
 entry_ip=ttk.Entry(cfg,width=18); entry_ip.insert(0,"192.168.1.101")
 entry_ip.grid(row=0,column=1,pady=15,sticky="w")
-var_spec=tk.BooleanVar()
-chk_spec=ttk.Checkbutton(cfg,text="spec mode",variable=var_spec)
-chk_spec.grid(row=0,column=2,padx=40)
+
+tk.Label(cfg, text="테스트할 확장 모듈 개수", bg="white", fg=LG_DARKTEXT)\
+   .grid(row=1, column=0, padx=(20, 5), pady=5, sticky="e")
+entry_expansion_count = ttk.Entry(cfg, width=18)
+entry_expansion_count.insert(0, "2")  # 기본값 2
+entry_expansion_count.grid(row=1, column=1, pady=5, sticky="w")
+
+
 btn_start=ttk.Button(cfg,text="Start FCT",style="LG.TButton")
 btn_start.grid(row=0,column=3,padx=(40,0))
 # 프로그레스바
@@ -274,10 +271,19 @@ def reset_ui():
 def on_start():
    btn_start.config(state="disabled")
    set_led("#FFC107")
-   pbar.place(x=270,y=85); pbar.start(12)
-   ip=entry_ip.get().strip(); spec=var_spec.get()
-   threading.Thread(target=run_fct,args=(ip,spec),daemon=True).start()
-btn_start.config(command=on_start)
+   pbar.place(x=270, y=85)
+   pbar.start(12)
+   ip = entry_ip.get().strip()
+
+   try:
+       expansion_count = int(entry_expansion_count.get().strip())
+       if expansion_count <= 0:
+           raise ValueError
+   except ValueError:
+       messagebox.showerror("Invalid input", "Expansion Count must be a positive integer.")
+       reset_ui()
+       return
+   threading.Thread(target=run_fct, args=(ip, expansion_count), daemon=True).start()
 def on_close():
    if messagebox.askokcancel("Exit","Quit FCT Tool?"):
        root.destroy()
@@ -287,4 +293,4 @@ root.mainloop()
 
 
 
-==> 여기에 new_cfg.yml 에 expansion-cout 값 사용자가 입력해서 조절할 수 있게 하려면 뭐를 추가해야할까
+설정카드 쪽에 정렬이 좀 안 예쁜것 같아 수정하고 전체적인 글자 크기들을 좀 더 키워 
