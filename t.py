@@ -1,533 +1,290 @@
 #!/usr/bin/env python3
-
-import subprocess
-import os
+# lg_fct_gui.py  ―  ACP-i FCT Tool (LG 테마 GUI)
+import os, sys, time, queue, threading, warnings, subprocess
+import tkinter as tk
+import tkinter.font as tkfont           # ←★ font 서브모듈 별도 import
+from tkinter import ttk, scrolledtext, simpledialog, messagebox
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import pandas as pd
 import yaml
-import shutil
-import sys
-import select
-import multiprocessing
-import json
+import paramiko
+# ────────── LG 컬러 팔레트 ──────────────────────────────────
+LG_RED      = "#A50034"
+LG_GRAY_BG  = "#F2F2F2"
+LG_DARKTEXT = "#333333"
+# ────────── GUI-↔스레드 통신용 큐 & 헬퍼 ───────────────────
+log_q: queue.Queue[str] = queue.Queue()
+def log(msg: str):
+   """네트워크 스레드 → GUI 로그창"""
+   log_q.put(msg)
+def ask_input(title: str, prompt: str) -> str:
+   """모달 입력창 (백그라운드 스레드에서 호출 가능)"""
+   holder = queue.Queue()
+   def _ask():
+       res = simpledialog.askstring(title, prompt, parent=root)
+       holder.put("" if res is None else res)
+   root.after(0, _ask)
+   return holder.get()
+# ────────── FCT 로직에 쓰이는 전역 상수 ────────────────────
+EXCEL_FILE = "local_file.xlsx"
+current_row_index = 0
+# ────────── 유틸 함수들 ────────────────────────────────────
+def remove_known_host(path, ip):
+   if not os.path.exists(path):
+       return True
+   with open(path) as f:
+       if any(ip in l for l in f):
+           subprocess.run(f"ssh-keygen -R {ip}", shell=True)
+   return True
+def find_next_row_index():
+   global current_row_index
+   try:
+       df = pd.read_excel(EXCEL_FILE)
+       for idx, row in df.iterrows():
+           if pd.isna(row["Check"]) or row["Check"] == "X":
+               current_row_index = idx
+               return True
+       log("[x] No available rows")
+       return False
+   except Exception as e:
+       log(f"[x] Excel error: {e}")
+       return False
+def read_sn_mac_from_file():
+   try:
+       df = pd.read_excel(EXCEL_FILE)
+       if df.empty or current_row_index >= len(df):
+           log("[x] Excel empty")
+           return False, None, None
+       sn = str(df.at[current_row_index,"Serial Number"]).strip()
+       mac = str(df.at[current_row_index,"Eth Address"]).strip()
+       return True, sn, mac
+   except Exception as e:
+       log(f"[x] Excel read err: {e}")
+       return False, None, None
+def update_check_column():
+   global current_row_index
+   try:
+       df = pd.read_excel(EXCEL_FILE, dtype={"Check":str})
+       df.at[current_row_index,"Check"]="O"
+       df.to_excel(EXCEL_FILE,index=False)
+       log("[v] Excel Check OK")
+       return True
+   except Exception as e:
+       log(f"[x] Excel write err: {e}")
+       return False
+def check_ssh_connection(ip, user, pwd="allnewb2b^^"):
+   log(f"[...] SSH connect {ip}")
+   try:
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd, timeout=60)
+       c.close()
+       log("[v] SSH OK")
+       return True
+   except Exception:
+       log("[x] SSH FAIL")
+       return False
+def execute_cmd(ip, user, cmd, pwd="allnewb2b^^"):
+   try:
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd, timeout=10)
+       _, stdout, _ = c.exec_command(cmd)
+       out = stdout.read().decode().strip()
+       c.close()
+       return out
+   except Exception as e:
+       log(f"[x] SSH cmd err: {e}")
+       return None
+def write_sn_mac_to_board(sn, mac, ip, user, pwd="allnewb2b^^"):
+   log("[...] Write SN/MAC")
+   write = f"echo {sn} > /persist/serial_number && /usr/bin/misc-util ETH_MAC {mac} && echo PACPIA000.AKM > /persist/model_number"
+   check = "cat /persist/serial_number && /usr/bin/misc-util ETH_MAC && cat /persist/model_number"
+   execute_cmd(ip,user,write,pwd)
+   out = execute_cmd(ip,user,check,pwd)
+   if not out: return False
+   lines = out.splitlines()
+   ok = (lines[0].strip()==sn and lines[1].strip()==mac and lines[2].strip()=="PACPIA000.AKM")
+   log("[v] SN/MAC OK" if ok else "[x] SN/MAC mismatch")
+   return ok
+def write_cfg_to_board(mac,sn,ip,user,pwd="allnewb2b^^"):
+   log("[...] Write cfg.yml")
+   try:
+       with open("new_cfg.yml") as f: cfg=yaml.safe_load(f)
+       cfg["ETH"]["mac"],cfg["VERSION"]["serial"]=mac,sn
+       with open("new_cfg.yml","w") as f: yaml.dump(cfg,f)
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd)
+       with open("new_cfg.yml","rb") as f:
+           stdin,_,_=c.exec_command("cat > /lg_rw/fct_test/cfg.yml")
+           stdin.write(f.read()); stdin.close()
+       c.close(); log("[v] cfg OK"); return True
+   except Exception as e:
+       log(f"[x] cfg err: {e}"); return False
+def write_pc_launcher_to_board(ip,user,pwd="allnewb2b^^"):
+   log("[...] Write launcher files")
+   try:
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd)
+       c.exec_command("mkdir -p /lg_rw/b2b-platform/http")
+       for local,remote in [("index.html","index.html"),("launcher.exe","launcher.exe")]:
+           with open(local,"rb") as f:
+               stdin,_,_=c.exec_command(f"cat > /lg_rw/b2b-platform/http/{remote}")
+               stdin.write(f.read()); stdin.close()
+       c.close(); log("[v] launcher OK"); return True
+   except Exception as e:
+       log(f"[x] launcher err: {e}"); return False
+def send_time_now(ip,user,pwd="allnewb2b^^"):
+   now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+   log(f"[...] Send time {now}")
+   try:
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd)
+       c.exec_command(f"echo '{now}' > /home/root/current_time"); time.sleep(0.5)
+       _,stdout,_=c.exec_command("cat /home/root/current_time")
+       ok = stdout.read().decode().strip()==now
+       c.close(); log("[v] Time OK" if ok else "[x] Time FAIL"); return ok
+   except Exception as e:
+       log(f"[x] Time err: {e}"); return False
+def start_fct_test(ip,user,ask_cb,pwd="allnewb2b^^"):
+   log("[...] Start FCT")
+   try:
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd, timeout=10)
+       chan=c.get_transport().open_session(); chan.get_pty()
+       chan.exec_command("python3 /lg_rw/fct_test/test_start_dq1.py")
+       while True:
+            if chan.recv_ready():
+                raw = chan.recv(4096)                       # 바이트 충분히
+                out = raw.decode("utf-8", errors="replace") # 한글 깨짐 방지
 
+                for line in out.splitlines():
+                    log(line)                               # 로그창에 그대로 출력
 
+                    # ─── [Q] 프롬프트 처리 ─────────────────────────
+                    if "[Q]" in line:
+                        # "[Q]" 문자열만 제거하고 앞뒤 공백은 정리
+                        prompt = line.replace("[Q]", "", 1).strip()
+                        answer = ask_cb("FCT", prompt)      # 사용자 입력 받기
+                        chan.send((answer or "") + "\n")    # 그대로 전송
+                        continue
 
-subprocess.run("dmesg -n 1", shell=True)
-# subprocess.run("mount -o rw,remount /", shell=True)
+                    # ─── 기타 y/n, serial 입력 처리(원형 유지) ───
+                    if "y/n" in line.lower():
+                        ans = ask_cb("FCT", line.strip())
+                        chan.send((ans or "") + "\n")
+                    elif "input serial" in line.lower():
+                        serial = ask_cb("Serial", "Input serial :")
+                        chan.send((serial or "") + "\n")
 
-
-def get_log_datetime():
-    # 현재 시스템 시간을 읽어와서 포맷팅합니다.
-    log_datetime = datetime.now().strftime('%Y-%m-%d %H:%M')
-    return log_datetime
-
-log_datetime = get_log_datetime()
-# 테스트 진행 중 출력 예시
-print("========================================")
-print("              TEST IN PROGRESS         ")
-print("========================================")
-print(f"Log date and time: {log_datetime}")
-
-# YAML 파일 읽기
-with open('/lg_rw/fct_test/cfg.yml', 'r') as file:
-    config = yaml.safe_load(file)
-
-
-# 이더넷 맥 주소 읽기
-def get_wired_addr():
-    cmd = "luna-send -n 1 -f luna://com.webos.service.systemservice/deviceInfo/query '{}'"
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    
-    try:
-        response = json.loads(result.stdout)
-        wired_addr = response.get("wired_addr", None)
-        if wired_addr:
-            # ":" 문자를 제거하고 소문자로 변환
-            wired_addr = wired_addr.replace(":", "").lower()
-            return wired_addr
-        else:
-            print("[log] wired_addr not found")
-            return "None"
-    except json.JSONDecodeError:
-        print("[log] Invalid JSON data")
-        return "None"
-
-eth_mac = get_wired_addr()
-
-
-expansion_count = config['USB'].get('expansion-count', False)
-
-# 로그 파일 설정
-
-usb_log_file_path = []
-log_file_path = []
-
-for i in range(expansion_count):
-    print(f"[Q] {i+1}번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
-    label_serial = input().strip()
-    usb_log_file_path.append(f"expansion_fct_test_{label_serial}.log")
-    log_file_path.append(f"/lg_rw/fct_test/expansion_fct_test_{label_serial}.log")
-
-
-# 로그 파일에 날짜 기록
-
-for file in log_file_path:
-    with open(file, 'a') as log_file:
-        log_file.write("###############################################################\n")
-        log_file.write(f"Test started at: {log_datetime}\n")
-
-# 테스트 항목, 스크립트, 순서
-test_items = {
-    'VERSION': ['sw_version_test.py',0],
-    'WIFI': ['wlan0_test.py',0],
-    'ETH': ['eth0_test.sh',0],
-    # 'BLUETOOTH': ['ble_test.py',0],
-    'DIO': ['dio_test.py',0],
-    'RTC': ['rtc_test.py',0],
-    'UART': ['485test.py',0],
-    'PWM': ['pwm_test.py',0],
-    'USB': ['usb_test.py',0],
-    'TOUCH': ['touch_test.py',0],
-    'LCD': ['lcd_test.py',0],
-}
-
-# 기본 설정값
-default_config = {
-    'VERSION': {'kernel': "", 'ram': "", "serial": "", "app" : "", "model": "" },
-    'UART': {'boadrate': 115200, 'data': 256},
-    'WIFI': {'ssid': 'next_test','name': 'wlan0', 'address': '192.168.0.1', 'password': '12345678', 'min': -60, 'max': -40},
-    'ETH': {'address': '192.168.0.1', "mac":""},
-    # 'BLUETOOTH': {'mac': '00:00:00:00:00:00','min': -60, 'max': -40},
-    'USB': {'file_path': '/lg_rw/fct_test', 'data': 1}
-}
-
-# 값의 범위 설정
-valid_ranges = {
-    'UART': {'boadrate': [4800, 9600, 19200, 38400, 57600, 115200], 'data': range(1, 256+1)},
-    'WIFI': {'name': str, 'address':str},
-    'ETH': {'address':str },
-    # 'BLUETOOTH': {'mac': str},
-}
-
-# 실시간 출력을 처리하는 함수
-def run_test_script(script, args):
-    # 실행파일이 파이썬인 경우
-    if script.endswith('.py'):
-        #print(f"Running Python script: {script} with args: {args}")
-        command = f"python3 -u {script} {args}"  # -u 플래그 추가
-    else:
-        command = f"{script} {args}"
-
-
-    process = subprocess.Popen(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True,  # 텍스트 모드로 스트림 처리
-        bufsize=1,  # 라인 버퍼링
-        env={**os.environ, 'PYTHONUNBUFFERED': '1'}  # PYTHONUNBUFFERED 환경 변수 설정
-    )
-    log_lines = []
-    last_line = ""
-
-    while True:
-        try:
-            output = process.stdout.readline()
-            if output:
-                print(output.strip(), flush=True)  # flush=True로 강제 플러시
-                log_lines.append(output.strip())
-                last_line = output.strip()
-            if process.poll() is not None:
-                break
-        except UnicodeDecodeError:
-            print("result message include UnicodeDecodeError. Ignoring the line.")
-    
-    # Ensure all remaining output is read
-    remaining_output = process.stdout.read()
-    if remaining_output:
-        for line in remaining_output.splitlines():
-            print(line.strip(), flush=True)
-            log_lines.append(line.strip())
-    
-    process.wait()  # Add this line
-    return process.returncode, log_lines
-
-#실시간 출력을 처리하는 함수
-def run_test_script_spi(script, args):
-    process = subprocess.run(f"{script} {args.strip()}", shell=True, capture_output=True, text=True,env=os.environ )  # strip args to remove trailing spaces
-    log_lines = []
-
-    try:
-        output = process.stdout.split('\n')  # split the output into lines
-        for line in output:
-            line = line.strip()  # strip line to remove trailing spaces
-            print(line, flush=True)  # flush=True로 강제 플러시
-            log_lines.append(line)
-    except UnicodeDecodeError:
-        print("result message include UnicodeDecodeError. Ignoring the line.")
-    return process.returncode, log_lines
-
-# 전역 변수 사용 최소화
-lock = multiprocessing.Lock()
-manager = multiprocessing.Manager()
-test_results = {}
-
-def get_test_args(item, config, default_config, valid_ranges):
-    if item not in config:
-        raise ValueError(f"Invalid test item: {item}")
-    
-    item_config = config.get(item, {})
-    default_item_config = default_config.get(item, {})
-    valid_item_ranges = valid_ranges.get(item, {})
-    
-    args = {}
-    
-    for key, default_value in default_item_config.items():
-
-        if key not in item_config or item_config[key] == None or item_config[key] == '':
-            value = default_value
-        else:
-            value = item_config[key]
-        
-        # valid_range 체크
-        valid_range = valid_item_ranges.get(key)
-        if valid_range is not None:
-            if isinstance(valid_range, range) and value not in valid_range:
-                raise ValueError(f"Invalid value for {item} {key}: {value}")
-            elif isinstance(valid_range, list) and value not in valid_range:
-                raise ValueError(f"Invalid value for {item} {key}: {value}")
-            elif isinstance(valid_range, type) and not isinstance(value, valid_range):
-                raise ValueError(f"Invalid type for {item} {key}: {value}")
-        
-        args[key] = value
-    return args
-
-def execute_test(item, script, verbose=True, index=0):
-    if config[item]['enable']:
-        test_name = item
-        repeat = config[item]['repeat']
-        
-        if verbose:
-            print(f"<TEST on {test_name}>", flush=True)
-        
-        test_results[test_name] = {}
-        
-        for i in range(repeat):
-            try:
-                args = get_test_args(item, config, default_config, valid_ranges)
-
-            except ValueError as e:
-                print(f"Error: {e}")
-                with lock:
-                    if repeat > 1:
-                        test_results[test_name][f'test_{i+1}'] = f"[{test_name}] FAIL (Invalid value)"
-                    else:   
-                        test_results[test_name] = f"[{test_name}] FAIL (Invalid value)"
-                return
-            
-            if item == 'UART':
-                args_str = f"{args['boadrate']} {args['data']}"
-            elif item == 'WIFI':
-                args_str = f"{args['ssid']} {args['min']} {args['max']} {args['password']} {args['address']}"
-            elif item == 'ETH':
-                skip_mac_check_flag = "--skip-mac-check" if config[item]['auto'] else ""
-                args_str = f"{args['address']} {args['mac']} {skip_mac_check_flag}".strip()
-            # elif item == 'BLUETOOTH':
-            #     args_str = f"{args['mac']} {args['min']} {args['max']}"
-            elif item == 'VERSION':
-                args_str = f"\"{args['app']}\" {args['kernel']} {args['ram']} {args['serial']} {args['model']}"
-            elif item == 'LCD':
-                # LCD 테스트를 위한 인자 설정
-                auto_flag = config[item].get('auto', False)
-                args_str = f"--auto" if auto_flag else ""
-            elif item == 'PWM':
-                auto_flag = config[item].get('auto', False)
-                args_str = f"--auto" if auto_flag else ""
-            elif item == 'RTC':
-                auto_flag = config[item].get('auto', False)
-                args_str = f"--default-time" if auto_flag else ""
-            elif item == 'USB':
-                args_str = f"--index {index}"
-                
-            else:
-                args_str = ''
-            
-            script_path = os.path.abspath(f"/lg_rw/fct_test/{script}")
-            
-            # 디버깅을 위한 추가 코드
-            if not os.path.exists(script_path):
-                print(f"Error: The script {script_path} does not exist!")
-                return
-            if not os.access(script_path, os.R_OK):
-                print(f"Error: The script {script_path} is not readable!")
-                return
-            
-            result_code, log_lines = run_test_script(script_path, args_str)
-            last_line = log_lines[-1] if log_lines else "No output"
-            
-            with lock:
-                if repeat > 1:
-                    test_results[test_name][f'test_{i+1}'] = last_line
-                else:   
-                    test_results[test_name] = last_line
-            
-             # 진행률 출력
-            # progress = (i + 1) / repeat * 100
-            # print(f"Progress: {i + 1}/{repeat} tests completed ({progress:.2f}%)", flush=True)
-
-        else:
-            # If the loop completes without a break, record the last result
-            with lock:
-                if repeat > 1:
-                    test_results[test_name][f'test_{i+1}'] = last_line
-                else:   
-                    test_results[test_name] = last_line
-
-
-# 병렬 실행 여부 확인
-parallel = config.get('global', {}).get('parallel', False)
-
-
-# wifi와 ble 테스트가 최초로 실행되었는지 여부를 추적하는 플래그
-first_run_done = multiprocessing.Event()
-stop_event = multiprocessing.Event()
-
-def worker(item, script, first_run_done, stop_event):
-
-    if item in ['WIFI']:
-        if not first_run_done.is_set():
-            execute_test(item, script, False)
-            first_run_done.set()
-    else:
-        while not stop_event.is_set():
-            execute_test(item, script, False)
-            if stop_event.is_set():
-                break
-    #print(item, "worker done....")
-
-def input_listener(stop_event):
-    print("Press Enter to stop the tests...\n")
-    while True:
-        # select.select()을 사용하여 입력을 모니터링
-        if select.select([sys.stdin], [], [], 1)[0]:
-            print("...")
-            # Enter 키 입력을 감지
-            if sys.stdin.read(1) == '\n':
-                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-                print("@@@@@@@@@@ You want to exit... @@@@@@@@@@@@")
-                print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-                stop_event.set()
-                
+            if chan.exit_status_ready():
                 break
 
 
-def run_tests_in_parallel():
-
-    processes = []
-    for item, script in test_items.items():
-        if config[item]['enable']:
-            p = multiprocessing.Process(target=worker, args=(item, script[0], first_run_done, stop_event))
-            p.start()
-            processes.append(p)
-
-    input_listener(stop_event)
-
-    for p in processes:
-        p.join()
-
-
-def run_all_tests(scripts):
-    failed_count = 0
-    total_count = 0
-    total_tests = sum(config[item]['repeat'] for item in scripts if config[item]['enable'])  # 수정된 부분
-    completed_tests = 0
-
-    for item, script in scripts.items():
-        if config[item]['enable']:
-            
-            for index, log_file in enumerate(log_file_path):
-                execute_test(item, script[0],False, index)
-
-                # 진행률 업데이트
-                completed_tests += config[item]['repeat']
-                overall_progress = (completed_tests / total_tests) * 100
-                with open(log_file, 'a') as log_file:
-                    for test_name, iterations in test_results.items():
-                        if isinstance(iterations, dict):
-                            for iteration, result in iterations.items():
-                                total_count += 1
-
-                                iteration_number = iteration.split('_')[1]  # 'test_1'에서 '1'만 추출
-                                
-                                if "OK" not in result:
-                                    all_tests_passed = False
-                                    failed_count += 1
-                                    details = result.split("FAIL", 1)[-1].strip()  # "FAIL" 이후의 내용 추출
-                                    details = details.strip("()")  # 양 옆의 괄호 제거
-                                    print(f"{test_name:<6} {iteration_number:<4} | {'':<1} FAIL {'':<1} | {details}")
-                                    log_file.write(f"{test_name:<6} {iteration_number:<4}| {'':<1} FAIL {'':<1} | {details}\n")
-                                else:
-                                    print(f"{test_name:<6} {iteration_number:<4} | {'':<2} OK {'':<2} |")
-                                    log_file.write(f"{test_name:<6} {iteration_number:<4} | {'':<2} OK {'':<2} |\n")
-                        else:
-                            total_count += 1
-                            if "OK" not in iterations:
-                                all_tests_passed = False
-                                failed_count += 1
-                                details = iterations.split("FAIL", 1)[-1].strip()  # "FAIL" 이후의 내용 추출
-                                details = details.strip("()")  # 양 옆의 괄호 제거
-                                print(f"{test_name:<10} | {'':<1} FAIL {'':<1} | {details}")
-                                log_file.write(f"{test_name:<10} | {'':<1} FAIL {'':<1} | {details}\n")
-                            else:
-                                print(f"{test_name:<10} | {'':<2} OK {'':<2} |")
-                                log_file.write(f"{test_name:<10} | {'':<2} OK {'':<2} |\n")
-
-                print("----------------------------------------")
-
-    
-
-
-# 병렬 실행 시
-if parallel:
-    run_tests_in_parallel()
-    #print("done")
-
-# 순차 실행 시
-else:
-    # 순서를 설정
-    for item in test_items.keys():
-        if config[item]['enable']:
-            # 순서를 체크한다
-            if 'order' in config[item]:
-                test_items[item][1] = config[item]['order']
-    
-    # 정렬한다
-    test_items = dict(sorted(test_items.items(), key=lambda item: item[1][1]))
-
-    run_all_tests(test_items)
-
-
-
-def find_usb_device():
-    for attempt in range(3):
-        try:
-            # /dev 디렉토리에서 FAT32, exFAT, vfat 파일 시스템을 가진 파티션을 찾음
-            lsblk_output = subprocess.run("lsblk -o NAME,FSTYPE", shell=True, capture_output=True, text=True).stdout.strip()
-            if lsblk_output:
-                lines = lsblk_output.splitlines()
-                for line in lines:
-                    parts = line.split()
-                    if len(parts) >= 2 and any(fs in parts[1] for fs in ['vfat', 'fat32', 'exfat']):
-                        device_name = parts[0].strip('`-')  # 디바이스 이름에서 `-` 문자를 제거
-                        return f"/dev/{device_name}"
-        except Exception as e:
-            print(f"Attempt {attempt + 1}: Failed to find USB device: {e}")
-    return None
-
-def is_mounted(device_name, mount_point):
-    try:
-        # mount 명령어를 사용하여 현재 마운트된 디바이스 목록을 확인
-        result = subprocess.run("mount", shell=True, capture_output=True, text=True).stdout.strip()
-        for line in result.splitlines():
-            if device_name in line and mount_point in line:
-                return True
-    except Exception as e:
-        print(f"Failed to check if device is mounted: {e}")
-    return False
-
-def mount_usb(device_name, mount_point):
-    for attempt in range(3):
-        try:
-            if not mount_point:
-                mount_point = "/lg_rw/fct_test/result"
-                os.makedirs(mount_point, exist_ok=True)
-            
-            # 디바이스가 이미 마운트되어 있는지 확인
-            if is_mounted(device_name, mount_point):
-                print(f"{device_name} is already mounted on {mount_point}")
-                return mount_point
-            
-            # 마운트 포인트가 존재하지 않으면 생성
-            if not os.path.exists(mount_point):
-                subprocess.run(f"mkdir -p {mount_point}", shell=True, check=True)
-            
-            # 디바이스 마운트
-            subprocess.run(f"mount {device_name} {mount_point}", shell=True, check=True)
-            return mount_point
-        except Exception as e:
-            print(f"Attempt {attempt + 1}: Failed to mount USB device: {e}")
-    return None
-
-def unmount_usb(mount_point):
-    for attempt in range(3):
-        try:
-            subprocess.run(f"umount {mount_point}", shell=True, check=True)
-            return True
-        except Exception as e:
-            print(f"Attempt {attempt + 1}: Failed to unmount USB device: {e}")
-    return False
-
-def compare_files(file1, file2):
-    try:
-        with open(file1, 'r') as f1, open(file2, 'r') as f2:
-            for line1, line2 in zip(f1, f2):
-                if line1 != line2:
-                    return False
-        return True
-    except Exception as e:
-        print(f"Failed to compare files: {e}")
-        return False
-
-def copy_log_file(src, dst):
-    for attempt in range(3):
-        try:
-            shutil.copy(src, dst)
-            print(f"Log file copied to USB: {dst}")
-            if compare_files(src, dst):
-                return True
-            else:
-                print(f"Verification failed for {dst}. Retrying...")
-        except Exception as e:
-            print(f"Attempt {attempt + 1}: Failed to copy log file to USB: {e}")
-    return False
-
-# USB 장치 찾기
-device_name = find_usb_device()
-
-if device_name:
-    # USB 장치 마운트
-    mount_point = mount_usb(device_name, "/lg_rw/fct_test/result")
-    if mount_point:
-        # 로그 파일 경로 생성
-        for idx, expansion_file in enumerate(usb_log_file_path):
-            # 각 확장 장치에 대해 로그 파일 경로 설정
-            usb_full_log_path = os.path.join(mount_point, expansion_file)
-
-            # 로그 파일을 USB로 복사 및 검증
-            if copy_log_file(log_file_path[idx], usb_full_log_path):
-                # USB 장치 언마운트
-                if not unmount_usb(mount_point):
-                    print("Failed to unmount USB device.")
-            else:
-                print("Failed to copy and verify log file to USB.")
-    else:
-        print("Failed to mount USB device")
-else:
-    print("USB device not found.")
+       status=chan.recv_exit_status(); chan.close(); c.close()
+       if status==0: log("[v] FCT done"); return True
+       log(f"[x] FCT fail ({status})"); return False
+   except Exception as e:
+       log(f"[x] FCT err: {e}"); return False
+# ────────── FCT 핵심 흐름 (백그라운드 스레드) ───────────────
+def run_fct(host_ip:str, spec_mode:bool):
+   username="root"
+   try:
+       remove_known_host(os.path.expanduser("~/.ssh/known_hosts"), host_ip)
+       if not spec_mode and not find_next_row_index(): return
+       # 연결 대기
+       while not check_ssh_connection(host_ip,username):
+           log("[*] Retry in 60s"); time.sleep(60)
+       log("================ Connection OK ================")
+       if not spec_mode:
+           ok,sn,mac=read_sn_mac_from_file()
+           if not ok: return
+           mac_clean=mac.replace(":","")
+           if not write_sn_mac_to_board(sn,mac_clean,host_ip,username): return
+           if not update_check_column(): return
+           if not write_pc_launcher_to_board(host_ip,username): return
+       else:
+           sn,mac_clean="DEFAULT_SN","00:00:00:00:00:00"
+       if not write_cfg_to_board(mac_clean,sn,host_ip,username): return
+       if not send_time_now(host_ip,username): return
+       if not start_fct_test(host_ip,username,ask_input): return
+       log("[v] ALL OK – replace board")
+   finally:
+       # GUI 버튼·프로그레스바 리셋
+       root.after(0, reset_ui)
+# ────────── Tkinter GUI 레이아웃 ───────────────────────────
+root = tk.Tk()
+root.title("ACP i - Expansion FCT Tool")
+root.configure(bg=LG_GRAY_BG)
+root.geometry("860x650")
+# 기본 폰트 설정
+default_font = ("맑은 고딕",10) if "맑은 고딕" in tkfont.families() else None
+if default_font:
+   root.option_add("*Font", default_font)
+style=ttk.Style(root); style.theme_use("default")
+style.configure("LG.TButton", background=LG_RED, foreground="white",
+               relief="flat", padding=(15,8))
+style.map("LG.TButton", background=[("active","#c31245"),("disabled","#D4A1AF")])
+style.configure("Card.TFrame", background="white", relief="ridge", borderwidth=2)
+style.configure("LG.Horizontal.TProgressbar", troughcolor=LG_GRAY_BG,
+               bordercolor=LG_GRAY_BG, background=LG_RED,
+               lightcolor=LG_RED, darkcolor=LG_RED)
+# 헤더
+hdr=ttk.Frame(root, style="Card.TFrame"); hdr.place(x=20,y=20,width=820,height=70)
+lbl_title=ttk.Label(hdr, text="ACP i - Expansion FCT Tool", foreground=LG_RED,
+                   font=(default_font[0],20,"bold") if default_font else ("",20,"bold"))
+lbl_title.pack(side="left", padx=20)
+led_color=tk.StringVar(value="#A0A0A0")
+canvas_led=tk.Canvas(hdr,width=20,height=20,highlightthickness=0)
+canvas_led.pack(side="right", padx=25)
+led=canvas_led.create_oval(2,2,18,18,fill=led_color.get(),outline="")
+def set_led(col): canvas_led.itemconfig(led, fill=col)
+# 설정 카드
+cfg=ttk.Frame(root, style="Card.TFrame"); cfg.place(x=20,y=110,width=820,height=100)
+tk.Label(cfg,text="Host IP",bg="white",fg=LG_DARKTEXT).grid(row=0,column=0,padx=(20,5),pady=15,sticky="e")
+entry_ip=ttk.Entry(cfg,width=18); entry_ip.insert(0,"192.168.1.101")
+entry_ip.grid(row=0,column=1,pady=15,sticky="w")
+var_spec=tk.BooleanVar()
+chk_spec=ttk.Checkbutton(cfg,text="spec mode",variable=var_spec)
+chk_spec.grid(row=0,column=2,padx=40)
+btn_start=ttk.Button(cfg,text="Start FCT",style="LG.TButton")
+btn_start.grid(row=0,column=3,padx=(40,0))
+# 프로그레스바
+pbar=ttk.Progressbar(root,style="LG.Horizontal.TProgressbar",
+                    mode="indeterminate",length=300)
+# 로그 카드
+log_frame=ttk.Frame(root,style="Card.TFrame")
+log_frame.place(x=20,y=230,width=820,height=400)
+txt_log=scrolledtext.ScrolledText(log_frame,width=97,height=22,bg="white",
+                                 fg=LG_DARKTEXT,font=(default_font[0],9)
+                                 if default_font else None,
+                                 state="disabled",bd=0,relief="flat")
+txt_log.pack(padx=15,pady=15,fill="both",expand=True)
+def pump_log():
+   while not log_q.empty():
+       line=log_q.get_nowait()
+       txt_log.config(state="normal"); txt_log.insert("end", line+"\n")
+       txt_log.see("end"); txt_log.config(state="disabled")
+       if line.startswith("[v]"): set_led("#0BB04B")
+       if line.startswith("[x]"): set_led(LG_RED)
+   root.after(120, pump_log)
+pump_log()
+def reset_ui():
+   pbar.stop(); pbar.place_forget()
+   btn_start.config(state="normal")
+   set_led("#A0A0A0")
+def on_start():
+   btn_start.config(state="disabled")
+   set_led("#FFC107")
+   pbar.place(x=270,y=85); pbar.start(12)
+   ip=entry_ip.get().strip(); spec=var_spec.get()
+   threading.Thread(target=run_fct,args=(ip,spec),daemon=True).start()
+btn_start.config(command=on_start)
+def on_close():
+   if messagebox.askokcancel("Exit","Quit FCT Tool?"):
+       root.destroy()
+root.protocol("WM_DELETE_WINDOW", on_close)
+warnings.filterwarnings("ignore",category=UserWarning)
+root.mainloop()
 
 
 
-이거를 실행 시키면, 지금 expansion-count 가 2라서 2번 테스트하고     2번 usb 에 기록되길 원하는 때 첫번째만 usb 에 기록되고
-Log file copied to USB: /lg_rw/fct_test/result/expansion_fct_test_999.log
-Log file copied to USB: /lg_rw/fct_test/result/expansion_fct_test_000.log
-umount: /lg_rw/fct_test/result: not mounted.
-Attempt 1: Failed to unmount USB device: Command 'umount /lg_rw/fct_test/result' returned non-zero exit status 32.
-umount: /lg_rw/fct_test/result: not mounted.
-Attempt 2: Failed to unmount USB device: Command 'umount /lg_rw/fct_test/result' returned non-zero exit status 32.
-umount: /lg_rw/fct_test/result: not mounted.
-Attempt 3: Failed to unmount USB device: Command 'umount /lg_rw/fct_test/result' returned non-zero exit status 32.
-Failed to unmount USB device.
-
-이런 오류가 떠
+==> 여기에 new_cfg.yml 에 expansion-cout 값 사용자가 입력해서 조절할 수 있게 하려면 뭐를 추가해야할까
