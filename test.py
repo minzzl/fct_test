@@ -183,45 +183,28 @@ def send_time_now(ip,user,pwd="allnewb2b^^"):
 
 # ────────── 테스트 루프 (abort 체크) ───────────────────
 def start_fct_test(ip,user,ask_cb,pwd="allnewb2b^^"):
-   log("[...] Start FCT")
-   try:
-       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-       c.connect(hostname=ip, username=user, password=pwd, timeout=10)
-       chan=c.get_transport().open_session(); chan.get_pty()
-       chan.exec_command("python3 /lg_rw/fct_test/test_start_dq1.py")
-       while True:
+    log("[...] Start FCT")
+    try:
+        c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        c.connect(hostname=ip, username=user, password=pwd, timeout=10)
+        chan=c.get_transport().open_session(); chan.get_pty()
+        chan.exec_command("python3 /lg_rw/fct_test/test_start_dq1.py")
+
+        while not abort_event.is_set():
             if chan.recv_ready():
-                raw = chan.recv(4096)                       # 바이트 충분히
-                out = raw.decode("utf-8", errors="replace") # 한글 깨짐 방지
-
+                out=chan.recv(4096).decode("utf-8", errors="replace")
                 for line in out.splitlines():
-                    log(line)                               # 로그창에 그대로 출력
+                    log(line)
+                    if line.startswith("[Q]"):
+                        txt=line.replace("[Q]","",1).strip()
+                        ans=ask_choice(txt) if "(y/n" in txt.lower() else ask_input("FCT", txt)
+                        chan.send((ans or "")+"\n")
+            if chan.exit_status_ready(): break
 
-                    # ─── [Q] 프롬프트 처리 ─────────────────────────
-                    if "[Q]" in line:
-                        # "[Q]" 문자열만 제거하고 앞뒤 공백은 정리
-                        prompt = line.replace("[Q]", "", 1).strip()
-                        answer = ask_cb("FCT", prompt)      # 사용자 입력 받기
-                        chan.send((answer or "") + "\n")    # 그대로 전송
-                        continue
-
-                    # ─── 기타 y/n, serial 입력 처리(원형 유지) ───
-                    if "y/n" in line.lower():
-                        ans = ask_cb("FCT", line.strip())
-                        chan.send((ans or "") + "\n")
-                    elif "input serial" in line.lower():
-                        serial = ask_cb("Serial", "Input serial :")
-                        chan.send((serial or "") + "\n")
-
-            if chan.exit_status_ready():
-                break
-
-
-       status=chan.recv_exit_status(); chan.close(); c.close()
-       if status==0: log("[v] FCT done"); return True
-       log(f"[x] FCT fail ({status})"); return False
-   except Exception as e:
-       log(f"[x] FCT err: {e}"); return False
+        status=chan.recv_exit_status(); chan.close(); c.close()
+        return status==0
+    except Exception as e:
+        log(f"[x] FCT err: {e}"); return False
 
 # ────────── FCT 전체 흐름 (abort 체크) ────────────────
 def run_fct(host_ip:str, expansion_count: int):
@@ -244,7 +227,7 @@ def run_fct(host_ip:str, expansion_count: int):
 
 # ────────── Tkinter GUI 설정 ─────────────────────────
 root = tk.Tk()
-root.title("ACP-i FCT Tool"); root.configure(bg=LG_GRAY_BG); root.geometry("860x650")
+root.title("ACP i - Expansion FCT Tool"); root.configure(bg=LG_GRAY_BG); root.geometry("860x650")
 default_font=("맑은 고딕",10) if "맑은 고딕" in tkfont.families() else None
 if default_font: root.option_add("*Font", default_font)
 
@@ -257,8 +240,9 @@ style.configure("LG.Horizontal.TProgressbar", troughcolor=LG_GRAY_BG, bordercolo
 
 # 헤더 & LED
 hdr=ttk.Frame(root, style="Card.TFrame"); hdr.place(x=20,y=20,width=820,height=70)
-ttk.Label(hdr, text="ACP-i FCT", foreground=LG_RED,
-          font=(default_font[0],20,"bold") if default_font else ("",20,"bold")).pack(side="left", padx=20)
+lbl_title=ttk.Label(hdr, text="ACP i - Expansion FCT Tool", foreground=LG_RED,
+                   font=(default_font[0],20,"bold") if default_font else ("",20,"bold"))
+lbl_title.pack(side="left", padx=20)
 canvas_led=tk.Canvas(hdr,width=20,height=20,highlightthickness=0); canvas_led.pack(side="right", padx=25)
 led=canvas_led.create_oval(2,2,18,18,fill="#A0A0A0",outline="")
 def set_led(col): canvas_led.itemconfig(led, fill=col)
@@ -328,4 +312,9 @@ warnings.filterwarnings("ignore", category=UserWarning)
 root.mainloop()
 
 
-이 코드에서 ask_choice 부분이 버튼으로 입력 받을 수 있게 한 건데 왜 버튼은 안보이고 사용자한테 키보드 입력 받게 되어있을까?
+
+그럼 이런 오류는?
+
+PS C:\Users\USER> python .\gui_fct_2.py
+# Host 192.168.1.101 found: line 17
+rename"C:\\Users\\USER/.ssh/known_hosts.S9pG32ORY6" to "C:\\Users\\USER/.ssh/known_hosts": Permission denied
