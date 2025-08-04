@@ -326,3 +326,6 @@ root.protocol("WM_DELETE_WINDOW", on_close)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 root.mainloop()
+
+
+이 코드에서 ask_choice 부분이 버튼으로 입력 받을 수 있게 한 건데 왜 버튼은 안보이고 사용자한테 키보드 입력 받게 되어있을까?
