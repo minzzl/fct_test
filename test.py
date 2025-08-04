@@ -311,10 +311,4 @@ root.protocol("WM_DELETE_WINDOW", on_close)
 warnings.filterwarnings("ignore", category=UserWarning)
 root.mainloop()
 
-
-
-그럼 이런 오류는?
-
-PS C:\Users\USER> python .\gui_fct_2.py
-# Host 192.168.1.101 found: line 17
-rename"C:\\Users\\USER/.ssh/known_hosts.S9pG32ORY6" to "C:\\Users\\USER/.ssh/known_hosts": Permission denied
+이 프로그램에서, 접속한 보드에서 /lg_rw/fct_test/expansion_fct_test_* 의 모든 파일을 프로그램이 실행되는 현재 위치에서 폴더를 생성해서 복사해오고 싶어. 근데 내가 가지고 있는 것과 비교해서 똑같은건 또 복사해오면 불필요한 작업이니까, 나한테 없는 것들만(파일 이름이 똑같더라도, 내용이 변경된 경우에는 복사해옴) 가져올 수 있도록 코드를 추가해
