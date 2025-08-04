@@ -1,409 +1,328 @@
-3.usb_test.py
-"import os
-import argparse
-import time
-import serial
-import threading
-import shutil
-import subprocess
+#!/usr/bin/env python3
+# lg_fct_gui.py  ―  ACP-i FCT Tool (LG 테마 GUI)
+import os, sys, time, queue, threading, warnings, subprocess, pathlib          # pathlib 추가
+import tkinter as tk
+import tkinter.font as tkfont
+from tkinter import ttk, scrolledtext, simpledialog, messagebox
+from datetime import datetime
+import pandas as pd
+import yaml
+import paramiko
+# ────────── 실행 위치(스크립트 vs 패키징 exe) ──────────
+BASE_DIR = pathlib.Path(sys.executable).parent if getattr(sys, 'frozen', False) \
+           else pathlib.Path(__file__).resolve().parent
 
-# 전역 변수로 결과 플래그 저장
-success_flag = True
-failed_tests = []
-lock = threading.Lock()  # Lock 객체 생성
+# ────────── LG 팔레트 ────────────────────────────────
+LG_RED, LG_GRAY_BG, LG_DARKTEXT = "#A50034", "#F2F2F2", "#333333"
 
-# 이벤트 객체 생성
-master_ready = threading.Event()
-slave_ready = threading.Event()
+# ────────── 전역 큐·플래그 ───────────────────────────
+log_q: queue.Queue[str] = queue.Queue()
+abort_event = threading.Event()          # ★ 강제 종료 플래그
 
-def log(message):
-    if args.debug:
-        print(f"[log] {message}")
+def log(msg: str): log_q.put(msg)
 
-def tx_485_test(port, buf_tx):
-    with lock:  # Lock을 사용하여 스레드 동기화
-        num_tx = port.write(buf_tx)  # 데이터 전송
-        if args.debug:
-            print(f"[{port.port}][send] send {num_tx} bytes.")
-    return num_tx
+# ────────── 기본 텍스트 입력 다이얼로그 ───────────────
+def ask_input(title: str, prompt: str) -> str:
+    holder = queue.Queue()
+    def _ask():
+        res = simpledialog.askstring(title, prompt, parent=root)
+        holder.put("" if res is None else res)
+    root.after(0, _ask)
+    return holder.get()
 
-def rx_485_test(port, rx_size):
-    start_time = time.time()
-    buf_rx = bytearray()  # 초기화
-    while True:
-        recved = port.read(rx_size - len(buf_rx))  # 남은 크기만큼 읽기
-        buf_rx += recved
-        if len(buf_rx) >= rx_size:
-            if args.debug:
-                print(f"[{port.port}][recv] Expected {rx_size}, Received {len(buf_rx)}")
-            break
-        if time.time() - start_time > 2:  # 타임아웃
-            if args.debug:
-                print("====== Timeout ======")
-                print(f"[{port.port}][recv] Expected {rx_size}, Received {len(buf_rx)}")
-            break
-    return buf_rx
+def ask_choice(prompt: str) -> str:
+   """(y/n) 또는 (y/n/r) 프롬프트를 버튼으로 처리, 반환 'y'|'n'|'r'."""
+   result = tk.StringVar()
+   def _ask():
+       # ── 팝업 창 ----
+       win = tk.Toplevel(root); win.title("FCT"); win.transient(root)
+       ttk.Label(win, text=prompt, wraplength=320).pack(padx=25, pady=18)
+       frm = ttk.Frame(win); frm.pack(pady=(0,18))
+       def done(val): result.set(val); win.destroy()
+       if 'r' in prompt.lower():       # y/n/r
+           ttk.Button(frm, text="성공", width=9, command=lambda: done('y')).pack(side="left", padx=6)
+           ttk.Button(frm, text="실패", width=9, command=lambda: done('n')).pack(side="left", padx=6)
+           ttk.Button(frm, text="다시",  width=9, command=lambda: done('r')).pack(side="left", padx=6)
+       else:                            # y/n
+           ttk.Button(frm, text="확인", width=9, command=lambda: done('y')).pack(side="left", padx=6)
+           ttk.Button(frm, text="취소", width=9, command=lambda: done('n')).pack(side="left", padx=6)
+       # ── 중앙 정렬 계산 ----
+       win.update_idletasks()           # 팝업 크기 계산
+       root.update_idletasks()          # ★ 루트창 실제 크기 갱신
+       w, h   = win.winfo_width(),  win.winfo_height()
+       rw, rh = root.winfo_width(), root.winfo_height()
+       rx, ry = root.winfo_rootx(), root.winfo_rooty()
+       # 루트 창이 아직 초기 배치 중이라면 화면 중앙으로
+       if rw <= 1 or rh <= 1:
+           sx = root.winfo_screenwidth()
+           sy = root.winfo_screenheight()
+           x = (sx - w)//2
+           y = (sy - h)//2
+       else:
+           x = rx + (rw - w)//2
+           y = ry + (rh - h)//2
+       win.geometry(f"+{x}+{y}")
+       # ── 모달 설정 ----
+       win.grab_set()
+       win.protocol("WM_DELETE_WINDOW", lambda: done('n'))
+   root.after(0, _ask)
+   root.wait_variable(result)
+   return result.get()
 
-def slave_thread(rs485_port, tx_buf, rx_buf):
-    global success_flag
-    for j in range(1):  # 반복 횟수를 1로 줄임
-        rs485_port.flushInput()
-        master_ready.wait()  # 마스터가 준비될 때까지 대기
-        rx = rx_485_test(rs485_port, len(rx_buf))
-        
-        port_name = f"tty{rs485_port.port[-1]}"
-        if tx_buf != rx:
-            if port_name not in failed_tests:  # 이미 실패 목록에 없는 경우에만 추가
-                success_flag = False
-                failed_tests.append(port_name)
-                if args.debug:
-                    print(f"[{j}][{rs485_port.port}][recv]: ", end="")
-                    for i in rx:
-                        print(f"{i:d}", end=" ")
-                    print("\n\n")
-        
-        rs485_port.flushOutput()
-        time.sleep(0.0015)
-        tx_485_test(rs485_port, tx_buf)
-        slave_ready.set()  # 슬레이브가 데이터를 보냈음을 알림
-        master_ready.clear()  # 마스터가 다시 대기 상태로 설정
-
-def master_thread(rs485_port, tx_buf, rx_buf):
-    global success_flag
-    for j in range(1):  # 반복 횟수를 1로 줄임
-        tx_485_test(rs485_port, tx_buf)
-        master_ready.set()  # 마스터가 데이터를 보냈음을 알림
-        slave_ready.wait()  # 슬레이브가 준비될 때까지 대기
-        rs485_port.flushInput()
-        rx = rx_485_test(rs485_port, len(rx_buf))
-        if tx_buf != rx:
-            port_name = f"tty{rs485_port.port[-1]}"
-            if port_name not in failed_tests:  # 이미 실패 목록에 없는 경우에만 추가
-                success_flag = False
-                failed_tests.append(port_name)
-                if args.debug:
-                    print(f"[{j}][{rs485_port.port}][recv]: ", end="")
-                    for i in rx:
-                        print(f"{i:d}", end=" ")
-                    print("\n\n")
-        rs485_port.flushOutput()
-        time.sleep(0.0015)
-        slave_ready.clear()  # 슬레이브가 다시 대기 상태로 설정
-
-def try_communicate(port1, port2, baudrate, data_size):
-    if args.debug:
-        print(f"[log] Communicating from {port1} to {port2} and {port2} to {port1}")
-    
-    rs485_port1 = serial.Serial(port=port1, baudrate=baudrate, timeout=0)
-    rs485_port2 = serial.Serial(port=port2, baudrate=baudrate, timeout=0)
-
-    tx_buf = bytearray([0x11 for _ in range(data_size)])
-    rx_buf = bytearray(data_size)
-    rs485_port1.flushInput()
-    rs485_port1.flushOutput()
-    rs485_port2.flushInput()
-    rs485_port2.flushOutput()
-
-    # 첫 번째 통신: port1이 master, port2가 slave
-    threads = [
-        threading.Thread(target=master_thread, args=(rs485_port1, tx_buf, rx_buf)),  # port1이 master
-        threading.Thread(target=slave_thread, args=(rs485_port2, tx_buf, rx_buf))    # port2가 slave
-    ]
-
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-def get_usb_products():
-    products = []
-    for device in os.listdir('/sys/bus/usb/devices/'):
-        try:
-            with open(f'/sys/bus/usb/devices/{device}/product', 'r') as f:
-                product = f.read().strip()
-                products.append(product)
-        except FileNotFoundError:
-            continue
-    return products
-
-def check_usb_expansion():
-    # USB 포트 체크
-    required_ports = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3']
-    missing_ports = [port for port in required_ports if not os.path.exists(port)]
-
-    if missing_ports:
-        log(f"Missing USB ports: {', '.join(missing_ports)}")
-        return False
-
-    log("All required USB ports are present.")
+EXCEL_FILE   = BASE_DIR / "local_file.xlsx"   # 수정
+CFG_TEMPLATE = BASE_DIR / "new_cfg.yml"       # 신규
+current_row_index = 0
+# ────────── 유틸 함수들 ───────────────────────────────
+def remove_known_host(path, ip):
+    if os.path.exists(path):
+        with open(path) as f:
+            if any(ip in l for l in f):
+                subprocess.run(f"ssh-keygen -R {ip}", shell=True)
     return True
 
-def check_usb_expansion_all():
-    # USB 포트 체크
-    required_ports = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3', '/dev/ttyUSB4', '/dev/ttyUSB5', '/dev/ttyUSB6', '/dev/ttyUSB7']
-    missing_ports = [port for port in required_ports if not os.path.exists(port)]
-
-    if missing_ports:
-        log(f"Missing USB ports: {', '.join(missing_ports)}")
-        return False
-
-    log("All required USB ports are present.")
-    return True
- 
-def check_usb_communication_all(baudrate, data_size):
-    global success_flag
+def find_next_row_index():
+    global current_row_index
     try:
-        for i in range(3):
-            try_communicate('/dev/ttyUSB0', '/dev/ttyUSB1', baudrate, data_size)  # 0과 1 간의 통신
-            try_communicate('/dev/ttyUSB2', '/dev/ttyUSB3', baudrate, data_size)  # 2와 3 간의 통신
-            try_communicate('/dev/ttyUSB4', '/dev/ttyUSB5', baudrate, data_size)  # 2와 3 간의 통신
-            try_communicate('/dev/ttyUSB6', '/dev/ttyUSB7', baudrate, data_size)  # 2와 3 간의 통신
+        df = pd.read_excel(EXCEL_FILE)
+        for idx, row in df.iterrows():
+            if pd.isna(row["Check"]) or row["Check"] == "X":
+                current_row_index = idx; return True
+        log("[x] No available rows"); return False
     except Exception as e:
-        success_flag = False
-        failed_tests.append(f"Communication error: {str(e)}")
+        log(f"[x] Excel error: {e}"); return False
 
-
-def check_usb_communication(baudrate, data_size):
-    global success_flag
+def read_sn_mac_from_file():
     try:
-        for i in range(3):
-            try_communicate('/dev/ttyUSB0', '/dev/ttyUSB1', baudrate, data_size)  # 0과 1 간의 통신
-            try_communicate('/dev/ttyUSB2', '/dev/ttyUSB3', baudrate, data_size)  # 2와 3 간의 통신
+        df = pd.read_excel(EXCEL_FILE)
+        if df.empty or current_row_index >= len(df):
+            log("[x] Excel empty"); return False, None, None
+        sn  = str(df.at[current_row_index,"Serial Number"]).strip()
+        mac = str(df.at[current_row_index,"Eth Address"]).strip()
+        return True, sn, mac
     except Exception as e:
-        success_flag = False
-        failed_tests.append(f"Communication error: {str(e)}")
+        log(f"[x] Excel read err: {e}"); return False, None, None
 
-def create_test_file(file_path, size_in_mb):
+def update_check_column():
     try:
-        with open(file_path, 'wb') as f:
-            f.write(os.urandom(size_in_mb * 1024 * 1024))  # 랜덤 데이터로 파일 생성
-        log(f"Test file created: {file_path}")
+        df = pd.read_excel(EXCEL_FILE, dtype={"Check": str})
+        df.at[current_row_index,"Check"]="O"; df.to_excel(EXCEL_FILE,index=False)
+        log("[v] Excel Check OK"); return True
     except Exception as e:
-        log(f"Failed to create test file: {e}")
+        log(f"[x] Excel write err: {e}"); return False
 
-def compare_files(file1, file2):
+def check_ssh_connection(ip, user, pwd="allnewb2b^^"):
+    log(f"[...] SSH connect {ip}")
     try:
-        with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
-            return f1.read() == f2.read()
-    except Exception as e:
-        log(f"Failed to compare files: {e}")
-        return False
+        c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        c.connect(hostname=ip, username=user, password=pwd, timeout=60)
+        c.close(); log("[v] SSH OK"); return True
+    except Exception:
+        log("[x] SSH FAIL"); return False
 
-def copy_test_file(src, dst):
+def execute_cmd(ip, user, cmd, pwd="allnewb2b^^"):
     try:
-        shutil.copy(src, dst)
-        log(f"Test file copied to USB: {dst}")
-        return True
+        c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        c.connect(hostname=ip, username=user, password=pwd, timeout=10)
+        _, stdout, _ = c.exec_command(cmd)
+        out = stdout.read().decode().strip(); c.close(); return out
     except Exception as e:
-        log(f"Failed to copy test file to USB: {e}")
-        return False
+        log(f"[x] SSH cmd err: {e}"); return None
 
-def usb_test(mount_point, file_size):
-    global success_flag
-    device_name = find_usb_device()
-    if device_name:
-        mount_usb(device_name, mount_point)
-        test_file_path = os.path.join(mount_point, 'usb_test_file.bin')
-        create_test_file(test_file_path, file_size)
-        copied_file_path = os.path.join(mount_point, 'usb_test_file_copy.bin')
-        if copy_test_file(test_file_path, copied_file_path):
-            if compare_files(test_file_path, copied_file_path):
-                log("USB test file copied and verified successfully.")
-            else:
-                success_flag = False
-                failed_tests.append("Verification failed for the copied file.")
-        unmount_usb(mount_point)
-    else:
-        success_flag = False
-        failed_tests.append("USB device not found.")
+def write_sn_mac_to_board(sn, mac, ip, user, pwd="allnewb2b^^"):
+    log("[...] Write SN/MAC")
+    write=(f"echo {sn} > /persist/serial_number && /usr/bin/misc-util ETH_MAC {mac} "
+           "&& echo PACPIA000.AKM > /persist/model_number")
+    check=("cat /persist/serial_number && /usr/bin/misc-util ETH_MAC && cat /persist/model_number")
+    execute_cmd(ip,user,write,pwd); out=execute_cmd(ip,user,check,pwd)
+    if not out: return False
+    l=out.splitlines(); ok=(l[0].strip()==sn and l[1].strip()==mac and l[2].strip()=="PACPIA000.AKM")
+    log("[v] SN/MAC OK" if ok else "[x] SN/MAC mismatch"); return ok
 
-def find_usb_device():
-    for attempt in range(3):
-        try:
-            lsblk_output = subprocess.run("lsblk -o NAME,FSTYPE", shell=True, capture_output=True, text=True).stdout.strip()
-            if lsblk_output:
-                lines = lsblk_output.splitlines()
-                for line in lines:
-                    parts = line.split()
-                    if len(parts) >= 2 and any(fs in parts[1] for fs in ['vfat', 'fat32', 'exfat']):
-                        device_name = parts[0].strip('`-')
-                        return f"/dev/{device_name}"
-        except Exception as e:
-            log(f"Attempt {attempt + 1}: Failed to find USB device: {e}")
-    return None
-
-def is_mounted(device_name, mount_point):
+def write_cfg_to_board(mac,sn,ip,user,pwd="allnewb2b^^"):
+    log("[...] Write cfg.yml")
     try:
-        result = subprocess.run("mount", shell=True, capture_output=True, text=True).stdout.strip()
-        for line in result.splitlines():
-            if device_name in line and mount_point in line:
-                return True
+        cfg=yaml.safe_load(open(CFG_TEMPLATE))
+        cfg["ETH"]["mac"], cfg["VERSION"]["serial"]=mac, sn
+        tmp=BASE_DIR/"_tmp_cfg.yml"; yaml.dump(cfg, open(tmp,"w"))
+        c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        c.connect(hostname=ip, username=user, password=pwd)
+        with open(tmp,"rb") as f:
+            stdin,_,_=c.exec_command("cat > /lg_rw/fct_test/cfg.yml")
+            stdin.write(f.read()); stdin.close()
+        c.close(); tmp.unlink(); log("[v] cfg OK"); return True
     except Exception as e:
-        log(f"Failed to check if device is mounted: {e}")
-    return False
+        log(f"[x] cfg err: {e}"); return False
 
-def mount_usb(device_name, mount_point):
-    for attempt in range(3):
-        try:
-            if not os.path.exists(mount_point):
-                os.makedirs(mount_point, exist_ok=True)
-            if is_mounted(device_name, mount_point):
-                log(f"{device_name} is already mounted on {mount_point}")
-                return mount_point
-            subprocess.run(f"mount {device_name} {mount_point}", shell=True, check=True)
-            return mount_point
-        except Exception as e:
-            log(f"Attempt {attempt + 1}: Failed to mount USB device: {e}")
-    return None
+def write_cfg_to_board(mac,sn,expansion_count,ip,user,pwd="allnewb2b^^"):
+   log("[...] Write cfg.yml")
+   try:
+       with open("new_cfg.yml") as f: cfg=yaml.safe_load(f)
+       cfg["ETH"]["mac"],cfg["VERSION"]["serial"],cfg["USB"]["expansion-count"] = mac,sn,expansion_count  # ★추가★
+       with open("new_cfg.yml","w") as f: yaml.dump(cfg,f)
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd)
+       with open("new_cfg.yml","rb") as f:
+           stdin,_,_=c.exec_command("cat > /lg_rw/fct_test/cfg.yml")
+           stdin.write(f.read()); stdin.close()
+       c.close(); log("[v] cfg OK"); return True
+   except Exception as e:
+       log(f"[x] cfg err: {e}"); return False
 
-def unmount_usb(mount_point):
-    for attempt in range(3):
-        try:
-            subprocess.run(f"umount {mount_point}", shell=True, check=True)
-            return True
-        except Exception as e:
-            log(f"Attempt {attempt + 1}: Failed to unmount USB device: {e}")
-    return False
-
-def check_usb_flag():
+def send_time_now(ip,user,pwd="allnewb2b^^"):
+    now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log(f"[...] Send time {now}")
     try:
-        with open('/lg_rw/fct_test/usb_write', 'r') as flag_file:
-            flag_content = flag_file.read().strip()
-            return flag_content == "1"  # 1이면 성공, 0이면 실패
+        c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        c.connect(hostname=ip, username=user, password=pwd)
+        c.exec_command(f"echo '{now}' > /home/root/current_time"); time.sleep(0.5)
+        _,stdout,_=c.exec_command("cat /home/root/current_time")
+        ok = stdout.read().decode().strip()==now
+        c.close(); log("[v] Time OK" if ok else "[x] Time FAIL"); return ok
     except Exception as e:
-        log(f"Failed to read USB flag file: {e}")
-        return False
+        log(f"[x] Time err: {e}"); return False
 
-def check_led_status():
+# ────────── 테스트 루프 (abort 체크) ───────────────────
+def start_fct_test(ip,user,ask_cb,pwd="allnewb2b^^"):
+   log("[...] Start FCT")
+   try:
+       c=paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+       c.connect(hostname=ip, username=user, password=pwd, timeout=10)
+       chan=c.get_transport().open_session(); chan.get_pty()
+       chan.exec_command("python3 /lg_rw/fct_test/test_start_dq1.py")
+       while True:
+            if chan.recv_ready():
+                raw = chan.recv(4096)                       # 바이트 충분히
+                out = raw.decode("utf-8", errors="replace") # 한글 깨짐 방지
 
-    global success_flag
-    """사용자에게 LED 상태를 확인합니다."""
-    if args.check_485_1:
-        print("[Q] 2쌍의 LED가 모두 반짝거렸습니까? (y/n 또는 r로 재시도): ")
-    if args.check_485_2:    
-        print("[Q] 4쌍의 LED가 모두 반짝거렸습니까? (y/n 또는 r로 재시도): ")
-    led_status = input().strip().lower()
+                for line in out.splitlines():
+                    log(line)                               # 로그창에 그대로 출력
 
-    if led_status == 'y':
-        return False
-    elif led_status == 'n':
-        failed_tests.append("LED")
-        success_flag = False
-    elif led_status == 'r':
-        print("RS485 통신을 다시 수행합니다...")
-        return True  # 재시도 필요
-    else:
-        print("잘못된 입력입니다. y, n 또는 r을 입력하세요.")
-        return False  # 재시도 필요 없음
-    return False  # 재시도 필요 없음
+                    # ─── [Q] 프롬프트 처리 ─────────────────────────
+                    if "[Q]" in line:
+                        # "[Q]" 문자열만 제거하고 앞뒤 공백은 정리
+                        prompt = line.replace("[Q]", "", 1).strip()
+                        answer = ask_cb("FCT", prompt)      # 사용자 입력 받기
+                        chan.send((answer or "") + "\n")    # 그대로 전송
+                        continue
 
-def main():
-    parser = argparse.ArgumentParser(description='USB Expansion Checker and RS-485 Communication')
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    parser.add_argument('--usb-test', action='store_true', help='Perform USB test by writing and verifying a file')
-    parser.add_argument('--check-485-1', action='store_true', help='Perform RS-485 communication check', default=False)
-    parser.add_argument('--check-485-2', action='store_true', help='Perform RS-485 communication check', default=False)
-    parser.add_argument('--mount-point', default='/lg_rw/fct_test/result', help='Mount point for the USB device')
-    parser.add_argument('--file-size', type=int, default=1, help='Size of the test file in MB')
+                    # ─── 기타 y/n, serial 입력 처리(원형 유지) ───
+                    if "y/n" in line.lower():
+                        ans = ask_cb("FCT", line.strip())
+                        chan.send((ans or "") + "\n")
+                    elif "input serial" in line.lower():
+                        serial = ask_cb("Serial", "Input serial :")
+                        chan.send((serial or "") + "\n")
 
-    global args
-    args = parser.parse_args()
-
-    #확장 모듈 체크 플래그
-    usb_expansion_success = True
-
-    # USB 플래그 체크 플래그
-    usb_flag_success = True
-
-    # 별도로 앱 다운로드 없이 USB 테스트가 필요한 경우에 수행
-    # only 확장 모듈 USB 포트 체크
-
-    if args.check_485_1:
-        # USB 통신 체크
-        usb_expansion_success = check_usb_expansion()
-
-        while True:
-            print("[*] 2쌍의 LED가 깜빡거립니다. LED 상태를 확인해주세요.")
-            baudrate = 9600  # 예시로 설정한 baudrate
-            data_size = 256   # 예시로 설정한 데이터 크기
-            check_usb_communication(baudrate, data_size)
-            # LED 상태 확인
-            if check_led_status():
-                continue
-            else:
-                break    
-    elif args.check_485_2:
-        # USB 통신 체크
-        usb_expansion_success = check_usb_expansion_all()
-
-        
-
-        while True:
-            print("[*] 4쌍의 LED가 깜빡거립니다. LED 상태를 확인해주세요.")
-            baudrate = 9600  # 예시로 설정한 baudrate
-            data_size = 256   # 예시로 설정한 데이터 크기
-            check_usb_communication_all(baudrate, data_size)
-            # LED 상태 확인
-            if check_led_status():
-                continue
-            else:
+            if chan.exit_status_ready():
                 break
-        
-    elif args.usb_test:
-        usb_test(args.mount_point, args.file_size)
-
-        usb_expansion_success = check_usb_expansion()
-        if not usb_expansion_success:
-            log("[USB] USB expansion module check failed. Please check the USB ports.")
-            failed_tests.append("Expansion Module")
-
-    else: 
-        # USB 플래그 체크
-        usb_flag_success = check_usb_flag()
-        if not usb_flag_success:
-            log("[USB] USB flag check failed. Please check the USB connection.")
-            failed_tests.append("USB Write")
-        usb_expansion_success = check_usb_expansion()
-        if not usb_expansion_success:
-            log("[USB] USB expansion module check failed. Please check the USB ports.")
-            failed_tests.append("Expansion Module")
 
 
-    # 최종 결과 출력
-    if usb_expansion_success and usb_flag_success and success_flag:
-        print("[USB] OK")
-    else:
-        print(f"[USB] FAIL ({', '.join(failed_tests)})")
+       status=chan.recv_exit_status(); chan.close(); c.close()
+       if status==0: log("[v] FCT done"); return True
+       log(f"[x] FCT fail ({status})"); return False
+   except Exception as e:
+       log(f"[x] FCT err: {e}"); return False
 
-if __name__ == "__main__":
-    main()"
+# ────────── FCT 전체 흐름 (abort 체크) ────────────────
+def run_fct(host_ip:str, expansion_count: int):
+   username="root"
+   try:
+       remove_known_host(os.path.expanduser("~/.ssh/known_hosts"), host_ip)
+       
+       while not check_ssh_connection(host_ip,username):
+           log("[*] Retry in 60s"); time.sleep(60)
+       log("================ Connection OK ================")
+       
+       sn,mac_clean="DEFAULT_SN","00:00:00:00:00:00"
+       if not write_cfg_to_board(mac_clean,sn,expansion_count,host_ip,username): return
+       if not send_time_now(host_ip,username): return
+       if not start_fct_test(host_ip,username,ask_input): return
+       log("[v] ALL OK – replace board")
+   finally:
+       # GUI 버튼·프로그레스바 리셋
+       root.after(0, reset_ui)
+
+# ────────── Tkinter GUI 설정 ─────────────────────────
+root = tk.Tk()
+root.title("ACP-i FCT Tool"); root.configure(bg=LG_GRAY_BG); root.geometry("860x650")
+default_font=("맑은 고딕",10) if "맑은 고딕" in tkfont.families() else None
+if default_font: root.option_add("*Font", default_font)
+
+style=ttk.Style(root); style.theme_use("default")
+style.configure("LG.TButton", background=LG_RED, foreground="white", relief="flat", padding=(15,8))
+style.map("LG.TButton", background=[("active","#c31245"),("disabled","#D4A1AF")])
+style.configure("Card.TFrame", background="white", relief="ridge", borderwidth=2)
+style.configure("LG.Horizontal.TProgressbar", troughcolor=LG_GRAY_BG, bordercolor=LG_GRAY_BG,
+                background=LG_RED, lightcolor=LG_RED, darkcolor=LG_RED)
+
+# 헤더 & LED
+hdr=ttk.Frame(root, style="Card.TFrame"); hdr.place(x=20,y=20,width=820,height=70)
+ttk.Label(hdr, text="ACP-i FCT", foreground=LG_RED,
+          font=(default_font[0],20,"bold") if default_font else ("",20,"bold")).pack(side="left", padx=20)
+canvas_led=tk.Canvas(hdr,width=20,height=20,highlightthickness=0); canvas_led.pack(side="right", padx=25)
+led=canvas_led.create_oval(2,2,18,18,fill="#A0A0A0",outline="")
+def set_led(col): canvas_led.itemconfig(led, fill=col)
+
+# 설정 카드
+cfg=ttk.Frame(root, style="Card.TFrame"); cfg.place(x=20,y=110,width=820,height=100)
+tk.Label(cfg,text="Host IP",bg="white",fg=LG_DARKTEXT).grid(row=0,column=0,padx=(20,5),pady=15,sticky="e")
+entry_ip=ttk.Entry(cfg,width=18); entry_ip.insert(0,"192.168.1.101"); entry_ip.grid(row=0,column=1,pady=15,sticky="w")
+
+tk.Label(cfg, text="테스트할 확장 모듈 개수", bg="white", fg=LG_DARKTEXT)\
+   .grid(row=1, column=0, padx=(20, 5), pady=5, sticky="e")
+entry_expansion_count = ttk.Entry(cfg, width=18)
+entry_expansion_count.insert(0, "2")  # 기본값 2
+entry_expansion_count.grid(row=1, column=1, pady=5, sticky="w")
 
 
-이렇게 3개의 파일이 있는데 수정을 해야해. 근데 어디를 수정해야할지 모르겠어. 
+btn_start=ttk.Button(cfg,text="Start FCT",style="LG.TButton"); btn_start.grid(row=0,column=3,padx=(40,0))
 
-일단 전체 구조를 말해주면, new_cfg.yml 에서 값을 읽어서 그 값을 기반으로 test_start_dq1.py 에서 테스트 파일을 실행시켜.new_cfg.yml 에 USB 부분만 enable true 니까 USB 테스트 스크립트만 실행될거야. 
-USB에 해당하는 테스트 스크립트가 usb_test.py 니까, 이게 실행이 될텐데 이거는 "'/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3'" ,  '/dev/ttyUSB4', '/dev/ttyUSB5', '/dev/ttyUSB6', '/dev/ttyUSB7' 이 있는지 확인하고 각각이 485통신을 잘 하는지 , led 가 모두 깜빡거렸는지를 체크해.
-내가 바꾸고 싶은건, "'/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3'" 한쌍,   '/dev/ttyUSB4', '/dev/ttyUSB5', '/dev/ttyUSB6', '/dev/ttyUSB7'  한쌍 .. 또 다음에 뭐가 연결된다면 8.9.10.11 뭐 이런식으로 될꺼고 총 3개가 붙은거잖아? 그럴 때에는 각각 파일 로그가 저장되면 좋겠어.
+# 프로그레스바
+pbar=ttk.Progressbar(root,style="LG.Horizontal.TProgressbar",mode="indeterminate",length=300)
 
-test_start_dq1.py 에 
+# 로그 카드
+log_frame=ttk.Frame(root,style="Card.TFrame"); log_frame.place(x=20,y=230,width=820,height=400)
+txt_log=scrolledtext.ScrolledText(log_frame,width=97,height=22,bg="white",fg=LG_DARKTEXT,
+                                  font=(default_font[0],9) if default_font else None,
+                                  state="disabled",bd=0,relief="flat")
+txt_log.pack(padx=15,pady=15,fill="both",expand=True)
 
+def pump_log():
+    while not log_q.empty():
+        line=log_q.get_nowait()
+        txt_log.config(state="normal"); txt_log.insert("end", line+"\n")
+        txt_log.see("end"); txt_log.config(state="disabled")
+        if line.startswith("[v]"): set_led("#0BB04B")
+        if line.startswith("[x]"): set_led(LG_RED)
+    root.after(120, pump_log)
+pump_log()
 
-if check1:
+def reset_ui():
+    pbar.stop(); pbar.place_forget(); btn_start.config(state="normal"); set_led("#A0A0A0")
 
-    print("[Q] 1번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
-    label_serial1 = input().strip()          ### CHANGED
-    usb_log_file_path = f"expansion_fct_test_{label_serial1}.log"
-if check2:
-    print("[Q] 1번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
-    label_serial1 = input().strip()          ### CHANGED
-    print("[Q] 2번 확장 보드의 시리얼 번호 입력(스캐너로 큐알을 스캔하세요):")
-    label_serial2 = input().strip()   
-    usb_log_file_path = f"expansion_fct_test_{label_serial1}_{label_serial2}.log"
+def on_start():
+   btn_start.config(state="disabled")
+   set_led("#FFC107")
+   pbar.place(x=270, y=85)
+   pbar.start(12)
+   ip = entry_ip.get().strip()
 
-이런식으로 해서 로그 파일이 생성되도록 했는데 알고보니까 이렇게 하는게 아니었고, 
-만약 1개의 확장모듈이 연결된다면"'/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3'" 한쌍,  에 대해서 연결 여부, 485테스트, led 깜빡거림을 검사하고 해당 확장 모듈의 시리얼 넘버를 스캔해서 "expansion_fct_test_{label_serial1}.log" 이름의 파일로 결과를 저장해야해.
-그리고 만약 2개의 확장 모듈이 연결된다면 각각의 확장 모듈에 대해서 테스트를 하고 파일이 생상되어야해.
-예를 들어서 "'/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyUSB2', '/dev/ttyUSB3'" 한쌍,  에 대해서 연결 여부, 485테스트, led 깜빡거림을 검사하고 해당 확장 모듈의 시리얼 넘버를 스캔해서 "expansion_fct_test_{label_serial1}.log" 이름의 파일로 결과를 저장해야해.
-그리고 그 다음은  '/dev/ttyUSB4', '/dev/ttyUSB5', '/dev/ttyUSB6', '/dev/ttyUSB7'  485테스트, led 깜빡거림을 검사하고 해당 확장 모듈의 시리얼 넘버를 스캔해서 "expansion_fct_test_{label_serial2}.log" 이름의 파일로 결과를 저장해야해.
-지금은 2개일 때는 개를 한꺼번에 테스트하고 파일 결과도 같이 저장하는데 분리를해야해. 
-어떻게 수정해야할까
+   try:
+       expansion_count = int(entry_expansion_count.get().strip())
+       if expansion_count <= 0:
+           raise ValueError
+   except ValueError:
+       messagebox.showerror("Invalid input", "Expansion Count must be a positive integer.")
+       reset_ui()
+       return
+   threading.Thread(target=run_fct, args=(ip, expansion_count), daemon=True).start()
+btn_start.config(command=on_start)
+
+def on_close():
+    if messagebox.askokcancel("Exit","Quit FCT Tool?"):
+        abort_event.set()       # ★ 강제 종료
+        root.destroy()
+root.protocol("WM_DELETE_WINDOW", on_close)
+
+warnings.filterwarnings("ignore", category=UserWarning)
+root.mainloop()
