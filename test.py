@@ -1,1 +1,3 @@
-cargo build --target aarch64-unknown-linux-gnu --release --features webos --no-default-features 
+....... 제가 한번 더 확인했어야했는데 ...... 1로 변경안된채로 테스트 돌아갔어서 .... (mount rw,remount / 를 안하셔서 저장이 제대로 안됬던 것 같아요,,) 
+
+변경한거 제 눈으로 확인하고 다시 테스트 돌려놨습니닷....................
