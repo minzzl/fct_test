@@ -1,6 +1,5 @@
 
-
-fn encode_cmde(&mut self) -> Bytes {
+    fn encode_cmde(&mut self) -> Bytes {
         let mut bytes = BytesMut::new();
 
         // 연결 끊김 체크
@@ -44,18 +43,6 @@ fn encode_cmde(&mut self) -> Bytes {
 
         // byte 4
         let page = self.current_page;
-        
-        info!("=====================unit_id: {}, current_page: {}=====================", self.unit_id, page);
-        let pdi_enabled = config().read().pdi;
-        //  실내기 개수를 카운트한다
-        let facilities = data_manager::facility::get_list_by_type(
-            &FacilityType::Physical("idu".to_string()),
-        )
-        .unwrap_or_default();
-        let idu_count = facilities.len() as u8;
-
-        info!("PDI enabled: {}, IDU count: {}", pdi_enabled, idu_count);
-
         match page {
             0 | 2 | 3 | 4 => {
                 // 0x0, 0x2, 0x3, 0x4
@@ -67,17 +54,8 @@ fn encode_cmde(&mut self) -> Bytes {
                 self.weight = 9999; // 무조건 다음 page에 대한 정보를 받기 위해 weight를 최대로 설정
             }
             0x20 | 0x22 | 0x23 | 0x24 => {
-                self.current_page = if self.unit_id == 1 { 0 } else { self.unit_id } + 0x33;
+                self.current_page = if self.unit_id == 1 { 0 } else { self.unit_id } + 0x40;
                 self.weight = 9999; // 무조건 다음 page에 대한 정보를 받기 위해 weight를 최대로 설정
-            }
-            0x38 | 0x39 | 0x3A | 0x3B | 0x3C => {
-                // PDI 설정 여부에 따라 페이지를 다르게 설정
-                info!("pdi: {}", config().read().pdi);
-                if config().read().pdi {
-                    // idu count 를 계산한다.
-                    
-                    self.current_page = if self.unit_id == 1 { 0 } else { self.unit_id } + 0x40;
-                } 
             }
             0x40 | 0x42 | 0x43 | 0x44 => {
                 self.current_page = if self.unit_id == 1 { 0 } else { self.unit_id };
@@ -119,22 +97,56 @@ fn encode_cmde(&mut self) -> Bytes {
         bytes.freeze()
     }
 
+    pub fn decode_super5(&mut self, bytes: Bytes) -> Result<()> {
+        let page = match bytes.get(5) {
+            Some(byte) => *byte,
+            None => return Err(anyhow!("Invalid super5 page")),
+        };
 
-여기서 
+        // NOTE: 타입 체크는 프로토콜 상 모든 페이지에서 동일하게 제공하지만,
+        // 실제 실외기에서는 page 0x0, 0x2, 0x3, 0x4에서만 제공된다.
+        if page == 0x0 || page == 0x2 || page == 0x3 || page == 0x4 {
+            let odu_type_upper = match bytes.get(6) {
+                Some(byte) => *byte & 0x0f,
+                None => return Err(anyhow!("Invalid super5 type")),
+            };
 
- 0x38 | 0x39 | 0x3A | 0x3B | 0x3C => {
-                // PDI 설정 여부에 따라 페이지를 다르게 설정
-                info!("pdi: {}", config().read().pdi);
-                if config().read().pdi {
-                    // idu count 를 계산한다.
-                    
-                    self.current_page = if self.unit_id == 1 { 0 } else { self.unit_id } + 0x40;
-                } 
+            let odu_type_pre = match odu_type_upper {
+                0 => "HP_".to_string(),
+                1 => "CO_".to_string(),
+                2 => "SYNC_".to_string(),
+                _ => format!("NONE[{}]_", odu_type_upper),
+            };
+
+            let odu_type_lower = match bytes.get(7) {
+                Some(byte) => *byte,
+                None => return Err(anyhow!("Invalid super5 type")),
+            };
+            let odu_type = odu_type_lower;
+            let odu_type: SubOduType = odu_type.try_into()?;
+            // if odu_type != SubOduType::Super5 {
+            //     return Err(anyhow!("Invalid super5 type"));
+            // }
+
+            let odu_type = format!("{}{}", odu_type_pre, odu_type);
+            if let Err(e) = data_table().write().set_text_unit(
+                DeviceType::OduUnit,
+                self.address(),
+                self.unit_id(),
+                "type",
+                &odu_type,
+            ) {
+                error!("Failed to set type: {e}");
             }
+        }
 
-이 부분을 수정해야해. 
+        match page {
+            0 | 2 | 3 | 4 => self.decode_super5_page0234(bytes),
+            10 | 12 | 13 | 14 => self.decode_super5_page10to14(bytes),
+            0x20 | 0x22 | 0x23 | 0x24 => self.decode_super5_page20to24(bytes),
+            0x40 | 0x42 | 0x43 | 0x44 => self.decode_super5_page40to44(bytes),
+            _ => Err(anyhow!("Invalid super5 page: {}", page)),
+        }
+    }
 
-각 page별 송신할 실내기 대수 : 실내기page 0x38~0x3B: 13개 실내기 , page 0x3C: 12개 실내기
-
-이렇게 인데 실내기 개수에 따라서 요청을 해야할 거 ㅅ같아ㅣ 지금이 요청하는 코드거든? 
-얘를들어 총 idu 가 13대이면 0x38 까지만 요청하면되고 만약 17대면 0x38, 0x39 까지, 뭐 이런식으로 각 페이지별로 13대씩가지고 있을 수 있고 0x3c 페이지에서는 12대까지만이긴한데 아무튼 이런식으로 ..idu_count 카운트 값을 이용하면 될 것 같아. 이때 pdi_enabled 이 true로 되어있어야해 
+사실 최초에 이런식으로 되어 있었는데, 내가 0X38 계열을 추가하면서 좀 수정을 한거거든? 괜찮아보여?
