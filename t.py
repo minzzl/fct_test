@@ -155,11 +155,8 @@ impl Super5 {
             .gets(DeviceType::Odu, self.address())
             .unwrap_or_default();
 
-        info!(
-            "Super5 encode_cmde: unit_id: {}, current_page: {}, port: {}",
-            self.unit_id, self.current_page, self.port
-        );
-        info!("addr: {}", self.address());
+        info!("Super5 encode_cmde: odu_id: {}, addr: {}, unit_id: {}, current_page: {}, port: {}",
+        self.odu_id, self.address(), self.unit_id, self.current_page, self.port);
 
         // byte 0
         let is_master = 1;
@@ -1976,10 +1973,11 @@ impl LgapDevice for Super5 {
 impl Fotable for Super5 {}
 
 
-흠 이렇게 했는데도 여전히 이상한 것 같아. 
 
-
- smart_plug_enable: 0**************88
+No aco_oper value
+ ERROR lgap_comm::io_handler::serial > Time elapsed: 141ms
+ WARN  lgap_comm                     > Failed to read: Read timeout: 140ms elapsed
+ INFO  lgap_comm::device::odu::super5 > smart_plug_enable: 0**************88
  INFO  lgap_comm::device::odu::super5 > address: 0, smart_plug_enable: 0
  ERROR lgap_comm::data                > Cannot find data: "odu_type"
  ERROR lgap_comm                      > Failed to control value: Cannot find data: "odu_type"
@@ -1989,20 +1987,16 @@ impl Fotable for Super5 {}
  INFO  lgap_comm::device::odu::super5 > address: 6, smart_plug_enable: 0
  ERROR lgap_comm::data                > Cannot find data: "odu_type"
  ERROR lgap_comm                      > Failed to control value: Cannot find data: "odu_type"
- INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: unit_id: 0, current_page: 0, port: 1
- INFO  lgap_comm::device::odu::super5 > addr: 0
+ INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: odu_id: 21865, addr: 6, unit_id: 0, current_page: 0, port: 1
  INFO  lgap_comm::device::odu::super5 > *=====================unit_id: 0, current_page: 0=====================
  WARN  lgap_comm::data                > No smart_plug_enable value
  INFO  lgap_comm::device::odu::super5 > PDI smart_flag: 0, IDU count: 3
  ERROR lgap_comm::io_handler::serial  > Time elapsed: 221ms
  WARN  lgap_comm                      > Failed to read: Read timeout: 220ms elapsed
- INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: unit_id: 0, current_page: 0, port: 0
- INFO  lgap_comm::device::odu::super5 > addr: 0
+ INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: odu_id: 19478, addr: 0, unit_id: 0, current_page: 0, port: 0
  INFO  lgap_comm::device::odu::super5 > *=====================unit_id: 0, current_page: 0=====================
  WARN  lgap_comm::data                > No smart_plug_enable value
  INFO  lgap_comm::device::odu::super5 > PDI smart_flag: 0, IDU count: 3
  INFO  lgap_comm::device::odu::super5 > smart_plug_enable: 0**************88
- INFO  lgap_comm::device::odu::super5 > address: 0, smart_plug_enable: 0
- INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: unit_id: 0, current_page: 0, port: 1
- INFO  lgap_comm::device::odu::super5 > addr: 6
- INFO  lgap_comm::device::odu::super5 > *=====================unit_id: 0, current_page: 0=====================
+ INFO  lgap_comm::device::odu::super5 > address: 6, smart_plug_enable: 0
+ INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: odu_id: 19478, addr: 0, unit_id: 0, current_page: 0, port: 1
