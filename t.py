@@ -155,6 +155,12 @@ impl Super5 {
             .gets(DeviceType::Odu, self.address())
             .unwrap_or_default();
 
+        info!(
+            "Super5 encode_cmde: unit_id: {}, current_page: {}, port: {}",
+            self.unit_id, self.current_page, self.port
+        );
+        info!("addr: {}", self.address());
+
         // byte 0
         let is_master = 1;
         let cmdcode = 0xe;
@@ -177,7 +183,7 @@ impl Super5 {
         // byte 4
         let page = self.current_page;
         
-        info!("=====================unit_id: {}, current_page: {}=====================", self.unit_id, page);
+        info!("*=====================unit_id: {}, current_page: {}=====================", self.unit_id, page);
         let smart_flag = data_sets.get("smart_plug_enable") as f32;
         //  실내기 개수를 카운트한다
         let facilities = data_manager::facility::get_list_by_type(
@@ -757,7 +763,22 @@ impl Super5 {
 
         // byte 56
         let smart_plug_enable = (byte56 >> 7) & 0x01;
+        info!("smart_plug_enable: {}**************88", smart_plug_enable);
         data_sets.set("smart_plug_enable", smart_plug_enable as f32);
+
+        if self.unit_id == 0 {
+            info!("address: {}, smart_plug_enable: {}", self.address(), smart_plug_enable);
+            if let Err(e) = data_table().write().set(
+                DeviceType::Odu,
+                self.address(),
+                "smart_plug_enable",
+                smart_plug_enable as f32,
+            ) {
+                error!("Failed to set Odu smart_plug_enable: {e}");
+            }
+         }
+
+
         if smart_plug_enable == 1 {
             let pwr_current = byte56 & 0x01;
             data_sets.set("pwr_type", pwr_current as f32);
@@ -1955,26 +1976,33 @@ impl LgapDevice for Super5 {
 impl Fotable for Super5 {}
 
 
+흠 이렇게 했는데도 여전히 이상한 것 같아. 
 
-> PDI smart_flag: 0, IDU count: 3
+
+ smart_plug_enable: 0**************88
+ INFO  lgap_comm::device::odu::super5 > address: 0, smart_plug_enable: 0
+ ERROR lgap_comm::data                > Cannot find data: "odu_type"
+ ERROR lgap_comm                      > Failed to control value: Cannot find data: "odu_type"
  ERROR lgap_comm::io_handler::serial  > Time elapsed: 221ms
  WARN  lgap_comm                      > Failed to read: Read timeout: 220ms elapsed
- INFO  lgap_comm::device::odu::super5 > =====================unit_id: 0, current_page: 0=====================
- WARN  lgap_comm::data                > No smart_plug_enable value
- INFO  lgap_comm::device::odu::super5 > PDI smart_flag: 0, IDU count: 3
- INFO  lgap_comm::device::odu::super5 > =====================unit_id: 0, current_page: 10=====================
+ INFO  lgap_comm::device::odu::super5 > smart_plug_enable: 0**************88
+ INFO  lgap_comm::device::odu::super5 > address: 6, smart_plug_enable: 0
+ ERROR lgap_comm::data                > Cannot find data: "odu_type"
+ ERROR lgap_comm                      > Failed to control value: Cannot find data: "odu_type"
+ INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: unit_id: 0, current_page: 0, port: 1
+ INFO  lgap_comm::device::odu::super5 > addr: 0
+ INFO  lgap_comm::device::odu::super5 > *=====================unit_id: 0, current_page: 0=====================
  WARN  lgap_comm::data                > No smart_plug_enable value
  INFO  lgap_comm::device::odu::super5 > PDI smart_flag: 0, IDU count: 3
  ERROR lgap_comm::io_handler::serial  > Time elapsed: 221ms
  WARN  lgap_comm                      > Failed to read: Read timeout: 220ms elapsed
- ERROR lgap_comm::io_handler::serial  > Time elapsed: 131ms
- WARN  lgap_comm                      > Failed to read: Read timeout: 120ms elapsed
- INFO  lgap_comm::device::odu::super5 > =====================unit_id: 0, current_page: 10=====================
+ INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: unit_id: 0, current_page: 0, port: 0
+ INFO  lgap_comm::device::odu::super5 > addr: 0
+ INFO  lgap_comm::device::odu::super5 > *=====================unit_id: 0, current_page: 0=====================
  WARN  lgap_comm::data                > No smart_plug_enable value
  INFO  lgap_comm::device::odu::super5 > PDI smart_flag: 0, IDU count: 3
- ERROR lgap_comm::io_handler::serial  > Time elapsed: 141ms
- WARN  lgap_comm                      > Failed to read: Read timeout: 140ms elapsed
- INFO  lgap_comm::device::odu::super5 > =====================unit_id: 0, current_page: 32=====================
-
-No smart_plug_enable value 라고 하는데 .. 내 생각에는 decode_super5_page0234 에서 smart_plug_enable 값을 set 하니까 괜찮을 줄 알았는데 아닌가? 
-
+ INFO  lgap_comm::device::odu::super5 > smart_plug_enable: 0**************88
+ INFO  lgap_comm::device::odu::super5 > address: 0, smart_plug_enable: 0
+ INFO  lgap_comm::device::odu::super5 > Super5 encode_cmde: unit_id: 0, current_page: 0, port: 1
+ INFO  lgap_comm::device::odu::super5 > addr: 6
+ INFO  lgap_comm::device::odu::super5 > *=====================unit_id: 0, current_page: 0=====================
