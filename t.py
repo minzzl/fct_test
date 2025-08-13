@@ -1,3 +1,4 @@
+
 void Create_DataLogging()
 {
 	lv_ui*ui=Ui_GetInstance();
@@ -31,11 +32,27 @@ void Create_DataLogging()
 		lv_obj_set_flex_flow(ui->mpDataloggingPage->mpLayoutLoadingData, LV_FLEX_FLOW_ROW);  // 🔥 가로 정렬 (아이콘 왼쪽, 텍스트 오른쪽)
 		lv_obj_set_flex_align(ui->mpDataloggingPage->mpLayoutLoadingData, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-		extern const lv_img_dsc_t ic_status_loading;
-		ui->mpDataloggingPage->mpLoaderImage = CreateImage(ui->mpDataloggingPage->mpLayoutLoadingData, &ic_status_loading, LV_ALIGN_LEFT_MID, 0, 0);
+		extern const lv_img_dsc_t ic_status_loading_1;
+		extern const lv_img_dsc_t ic_status_loading_2;
+		extern const lv_img_dsc_t ic_status_loading_3;
+		extern const lv_img_dsc_t ic_status_loading_4;
 
-		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped = CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_LOGGING_DATA, LV_ALIGN_CENTER, 0, 0);
-		lv_obj_align_to(ui->mpDataloggingPage->mpLabelLogging_OR_Stopped, ui->mpDataloggingPage->mpLoaderImage, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
+		 static const lv_img_dsc_t * frames[] = {
+			&ic_status_loading_1,
+			&ic_status_loading_2,
+			&ic_status_loading_3,
+			&ic_status_loading_4,
+		};		
+		
+		lv_obj_t *anim = lv_animimg_create(ui->mpDataloggingPage->mpLayoutLoadingData);
+		lv_animimg_set_src(anim, (const void **)frames, sizeof(frames)/sizeof(frames[0]));
+		lv_animimg_set_duration(anim, 500); // 전체 1회전 500ms (프레임 4개면 프레임당 ~125ms)
+		lv_animimg_set_repeat_count(anim, LV_ANIM_REPEAT_INFINITE);
+		lv_obj_align(anim, LV_ALIGN_LEFT_MID, 0, 0);
+		lv_animimg_start(anim);
+		ui->mpDataloggingPage->mpLoaderImage = anim;        // 기존 포인터 재활용(타입은 lv_obj_t*)
+		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped =CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_LOGGING_DATA, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_align_to(ui->mpDataloggingPage->mpLabelLogging_OR_Stopped, ui->mpDataloggingPage->mpLoaderImage,LV_ALIGN_OUT_RIGHT_MID, 8, 0);
 	}
 	else
 	{
@@ -68,14 +85,5 @@ void Create_DataLogging()
 
 }
 
-이 코드에서 extern const lv_img_dsc_t ic_status_loading;
-		ui->mpDataloggingPage->mpLoaderImage = CreateImage(ui->mpDataloggingPage->mpLayoutLoadingData, &ic_status_loading, LV_ALIGN_LEFT_MID, 0, 0);
 
-		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped = CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_LOGGING_DATA, LV_ALIGN_CENTER, 0, 0);
-		lv_obj_align_to(ui->mpDataloggingPage->mpLabelLogging_OR_Stopped, ui->mpDataloggingPage->mpLoaderImage, LV_ALIGN_OUT_RIGHT_MID, 8, 0); 
-
-이 부분에 하나의 아이콘만 보이는게 아니라 3개 정도를 번갈아가면서 보이도록 하려고 해.
-
-로깅중이라서 동그라미 돌아가는게 움직이는 것처럼 보이도록.
-
-그러려면 어떻게 수정해야할까
+근데 칸을 벗어나서 로딩 아이콘이 너무 크게 보이는데 ??? 
