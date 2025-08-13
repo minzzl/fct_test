@@ -141,5 +141,13 @@ void LongPressKeyTimer(lv_timer_t * timer)
 
 
 근데 좌우키가 눌러졌다는거는 static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED}; 로 판단을 하고 있어서 3초 검사가 의미 없는 것 같기도해 . 
+	else if(pKeyCode->KeyAction==KEY_PRESSED && pKeyCode->KeyCode==KEY_LR_LONG && ui->mUiState.mucCurrentState==WINDOW_OPENSOURCE)
+			{
+				ui->mUiState.mucCurrentState=POP_ID_RESET_PASSWORD;
+				lv_obj_send_event(ui->mpEventStateSwitch,LV_EVENT_CLICKED,NULL);
+			}
+		}
+
+이런식으로 하고 있었거든
 
 3초 검사를 완료하고 static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED}; 로 설정을 해주던가 해야할 것 같아
