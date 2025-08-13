@@ -1,153 +1,81 @@
-void KeyEventTimer(lv_timer_t * timer)
+void Create_DataLogging()
 {
-	KeyCode* key1=lv_timer_get_user_data(timer);
+	lv_ui*ui=Ui_GetInstance();
 
-	if(key1->KeyCode == 0 && key1->KeyAction ==0)
+	ui->mpDataloggingPage=calloc(1, sizeof(ui_DataLogging));
+	if(ui->mpDataloggingPage==NULL)
 	{
-		lv_log("===============Left Key Relesed========================\n");
-
-		if(Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress == true && Ui_GetInstance()->mUiKeyLongPress.RightKeyPress == true)
-		{
-			if (Ui_GetInstance()->LongPressKeytimer != NULL){
-				lv_timer_delete(Ui_GetInstance()->LongPressKeytimer);
-				Ui_GetInstance()->LongPressKeytimer = NULL;
-				Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress = false;
-			}
-		}
-
-
-		if(Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress)
-		{
-			lv_obj_send_event(Ui_GetInstance()->mpEventKeyWidget,LV_EVENT_CLICKED,key1);
-		}
-		Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress = false;
+		lv_log("%s\n","Failed to allocate ui->mpConnectAppPage");
 	}
-	else if(key1->KeyCode == 0 && key1->KeyAction ==1)
+
+	ui->mpDataloggingPage->mpPageWindowArea=CreatePageArea(ui->mpPageWindowArea);
+
+	ui->mpDataloggingPage->mpLayoutTitleText = CreateLayout(ui->mpDataloggingPage->mpPageWindowArea, LV_ALIGN_CENTER, TITLE_X_Y_HEIGHT_WIDTH);
+	lv_obj_align_to(ui->mpDataloggingPage->mpLayoutTitleText, ui->mpTopArea, LV_ALIGN_OUT_BOTTOM_MID, 0,0);
+
+	ui->mpDataloggingPage->mpLabelDataLogging = CreateTitle(ui->mpDataloggingPage->mpLayoutTitleText, TR_TITLE_DATA_LOGGING);
+	lv_obj_set_style_text_font(ui->mpDataloggingPage->mpLabelDataLogging, &KR_FONT_24B, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+	if (ui->isDataLoggingON)
 	{
-		lv_log("===============Left Key Pressed========================\n");
+		// 배경 추가
+		ui->mpDataloggingPage->mpLayoutLoadingData = CreateLayout(ui->mpDataloggingPage->mpPageWindowArea, LV_ALIGN_CENTER, 0, 0, 185, 40);
+		lv_obj_align_to(ui->mpDataloggingPage->mpLayoutLoadingData, ui->mpDataloggingPage->mpLayoutTitleText, LV_ALIGN_OUT_BOTTOM_MID, 0, 28);
 
-		pthread_mutex_lock(&serviceHandleMutex);
-		callPWM(serviceHandle);
-		pthread_mutex_unlock(&serviceHandleMutex);
+		// 배경 스타일 적용
+		lv_obj_set_style_bg_color(ui->mpDataloggingPage->mpLayoutLoadingData, lv_color_make(51, 51, 51), LV_PART_MAIN);
+		lv_obj_set_style_radius(ui->mpDataloggingPage->mpLayoutLoadingData, 50, LV_PART_MAIN); // 둥근 모서리
+		lv_obj_set_style_bg_opa(ui->mpDataloggingPage->mpLayoutLoadingData, LV_OPA_COVER, LV_PART_MAIN);
+		lv_obj_set_style_border_width(ui->mpDataloggingPage->mpLayoutLoadingData, 0, LV_PART_MAIN);
 
-		Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress = true;
+		lv_obj_set_flex_flow(ui->mpDataloggingPage->mpLayoutLoadingData, LV_FLEX_FLOW_ROW);  // 🔥 가로 정렬 (아이콘 왼쪽, 텍스트 오른쪽)
+		lv_obj_set_flex_align(ui->mpDataloggingPage->mpLayoutLoadingData, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-		if(Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress == true && Ui_GetInstance()->mUiKeyLongPress.RightKeyPress == true)
-		{
-			static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED};
-			if (Ui_GetInstance()->LongPressKeytimer == NULL){
-				Ui_GetInstance()->LongPressKeytimer = lv_timer_create(LongPressKeyTimer, 10,&keyLong);
-				}
-		}
+		extern const lv_img_dsc_t ic_status_loading;
+		ui->mpDataloggingPage->mpLoaderImage = CreateImage(ui->mpDataloggingPage->mpLayoutLoadingData, &ic_status_loading, LV_ALIGN_LEFT_MID, 0, 0);
+
+		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped = CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_LOGGING_DATA, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_align_to(ui->mpDataloggingPage->mpLabelLogging_OR_Stopped, ui->mpDataloggingPage->mpLoaderImage, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
 	}
-	else if(key1->KeyCode == 2 && key1->KeyAction ==0)
+	else
 	{
-		lv_log("===============Right Key Relesed========================\n");
+		// 배경 추가
+		ui->mpDataloggingPage->mpLayoutLoadingData = CreateLayout(ui->mpDataloggingPage->mpPageWindowArea, LV_ALIGN_CENTER, 0, 0, 130, 40);
+		lv_obj_align_to(ui->mpDataloggingPage->mpLayoutLoadingData, ui->mpDataloggingPage->mpLayoutTitleText, LV_ALIGN_OUT_BOTTOM_MID, 0, 28);
 
-		if(Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress == true && Ui_GetInstance()->mUiKeyLongPress.RightKeyPress == true)
-		{
-			if (Ui_GetInstance()->LongPressKeytimer != NULL){
-				lv_timer_delete(Ui_GetInstance()->LongPressKeytimer);
-				Ui_GetInstance()->LongPressKeytimer = NULL;
-				Ui_GetInstance()->mUiKeyLongPress.RightKeyPress = false;
-			}
-		}
+		// 배경 스타일 적용
+		lv_obj_set_style_bg_color(ui->mpDataloggingPage->mpLayoutLoadingData, lv_color_make(51, 51, 51), LV_PART_MAIN);
+		lv_obj_set_style_radius(ui->mpDataloggingPage->mpLayoutLoadingData, 50, LV_PART_MAIN); // 둥근 모서리
+		lv_obj_set_style_bg_opa(ui->mpDataloggingPage->mpLayoutLoadingData, LV_OPA_COVER, LV_PART_MAIN);
+		lv_obj_set_style_border_width(ui->mpDataloggingPage->mpLayoutLoadingData, 0, LV_PART_MAIN);
 
+		lv_obj_set_flex_flow(ui->mpDataloggingPage->mpLayoutLoadingData, LV_FLEX_FLOW_ROW);  // 🔥 가로 정렬 (아이콘 왼쪽, 텍스트 오른쪽)
+		lv_obj_set_flex_align(ui->mpDataloggingPage->mpLayoutLoadingData, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-		if(Ui_GetInstance()->mUiKeyLongPress.RightKeyPress)
-		{
-			lv_obj_send_event(Ui_GetInstance()->mpEventKeyWidget,LV_EVENT_CLICKED,key1);
-		}
-		Ui_GetInstance()->mUiKeyLongPress.RightKeyPress = false;
+		extern const lv_img_dsc_t ic_status_stop;
+		ui->mpDataloggingPage->mpLoaderImage = CreateImage(ui->mpDataloggingPage->mpLayoutLoadingData, &ic_status_stop, LV_ALIGN_LEFT_MID, 0, 0);
+
+		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped = CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_STOPPED_LOGGING, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_align_to(ui->mpDataloggingPage->mpLabelLogging_OR_Stopped, ui->mpDataloggingPage->mpLoaderImage, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
 	}
-	else if(key1->KeyCode == 2 && key1->KeyAction ==1)
-	{
-		lv_log("===============Right Key Pressed========================\n");
 
-		pthread_mutex_lock(&serviceHandleMutex);
-		callPWM(serviceHandle);
-		pthread_mutex_unlock(&serviceHandleMutex);
 
-		Ui_GetInstance()->mUiKeyLongPress.RightKeyPress = true;
+	ui->mpDataloggingPage->mpLayoutTextBtn =CreateLayout(ui->mpDataloggingPage->mpPageWindowArea, LV_ALIGN_CENTER, 0 ,0 , 258, 83);
+	lv_obj_align_to(ui->mpDataloggingPage->mpLayoutTextBtn, ui->mpDataloggingPage->mpLayoutTitleText, LV_ALIGN_OUT_BOTTOM_MID, 0, 84);
 
-		if(Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress == true && Ui_GetInstance()->mUiKeyLongPress.RightKeyPress == true){
-			
-			static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED};
-			if (Ui_GetInstance()->LongPressKeytimer == NULL){
-				Ui_GetInstance()->LongPressKeytimer = lv_timer_create(LongPressKeyTimer, 10,&keyLong);
+	ui->mpDataloggingPage->mpLabelKeyPress = CreateImageText(ui->mpDataloggingPage->mpLayoutTextBtn, (ui->isDataLoggingON ? TR_O_PRESS_STOP_LOGGING : TR_O_PRESS_START_LOGGING), LV_ALIGN_CENTER, 0, 0);
 
-			}
-		}
-	}
-	else if(key1->KeyCode == 1 && key1->KeyAction ==0)
-	{
-		lv_log("===============OK Key Pressed========================\n");
-		pthread_mutex_lock(&serviceHandleMutex);
-		callPWM(serviceHandle);
-		pthread_mutex_unlock(&serviceHandleMutex);
-
-		lv_obj_send_event(Ui_GetInstance()->mpEventKeyWidget,LV_EVENT_CLICKED,key1);
-	}
-	if (Ui_GetInstance()->EventTimer != NULL){
-		lv_timer_delete(Ui_GetInstance()->EventTimer);
-		Ui_GetInstance()->EventTimer = NULL;
-	}
 
 }
 
+이 코드에서 extern const lv_img_dsc_t ic_status_loading;
+		ui->mpDataloggingPage->mpLoaderImage = CreateImage(ui->mpDataloggingPage->mpLayoutLoadingData, &ic_status_loading, LV_ALIGN_LEFT_MID, 0, 0);
 
+		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped = CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_LOGGING_DATA, LV_ALIGN_CENTER, 0, 0);
+		lv_obj_align_to(ui->mpDataloggingPage->mpLabelLogging_OR_Stopped, ui->mpDataloggingPage->mpLoaderImage, LV_ALIGN_OUT_RIGHT_MID, 8, 0); 
 
-void LongPressKeyTimer(lv_timer_t * timer)
-{
-   // ★추가: 3초 경과 측정을 위한 정적 시작 시간
-   static uint32_t s_lr_start_ms = 0;
-   // 둘 다 계속 눌려있는지 확인 (연속 유지 조건)
-   if (!(Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress &&
-         Ui_GetInstance()->mUiKeyLongPress.RightKeyPress)) {
-       // 하나라도 떼졌으면 타이머 종료 및 초기화 (이벤트 미발생)
-       if (Ui_GetInstance()->LongPressKeytimer){
-           lv_timer_delete(Ui_GetInstance()->LongPressKeytimer);
-           Ui_GetInstance()->LongPressKeytimer = NULL;
-       }
-       s_lr_start_ms = 0;
-       return;
-   }
-   // 첫 진입(타이머가 처음 돌기 시작) 시각 기록
-   if (s_lr_start_ms == 0) {
-       s_lr_start_ms = lv_tick_get();
-       return; // 다음 틱부터 경과 검사
-   }
-   // 3초(3000ms) 이상 연속 유지되었는지 검사
-   if (lv_tick_elaps(s_lr_start_ms) >= 3000) {
-       lv_log("=============================== Both Keys are Long Pressed (>=3s) =======================\n");
-       KeyCode* keyLong = lv_timer_get_user_data(timer);
-       printf("KeyAction:%d,  KeyCode:%d, keyLong:%d\n",
-              keyLong->KeyAction, keyLong->KeyCode, keyLong->Type);
-       // 동시-롱 이벤트 전송
-       lv_obj_send_event(Ui_GetInstance()->mpEventKeyWidget, LV_EVENT_CLICKED, keyLong);
-       // 기존 플래그/타이머 정리 (개별 클릭 억제 효과 유지)
-       Ui_GetInstance()->bLongPressKeytimerLeftFlag  = false;
-       Ui_GetInstance()->bLongPressKeytimerRightFlag = false;
-       if (Ui_GetInstance()->LongPressKeytimer){
-           lv_timer_delete(Ui_GetInstance()->LongPressKeytimer);
-           Ui_GetInstance()->LongPressKeytimer = NULL;
-       }
-       // 개별 Release 시 클릭 안 나가도록 올-프레스 플래그도 원래대로 내림(기존 코드 유지)
-       Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress  = false;
-       Ui_GetInstance()->mUiKeyLongPress.RightKeyPress = false;
-       s_lr_start_ms = 0; // 다음 사이클 대비 초기화
-   }
-}
+이 부분에 하나의 아이콘만 보이는게 아니라 3개 정도를 번갈아가면서 보이도록 하려고 해.
 
+로깅중이라서 동그라미 돌아가는게 움직이는 것처럼 보이도록.
 
-근데 좌우키가 눌러졌다는거는 static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED}; 로 판단을 하고 있어서 3초 검사가 의미 없는 것 같기도해 . 
-	else if(pKeyCode->KeyAction==KEY_PRESSED && pKeyCode->KeyCode==KEY_LR_LONG && ui->mUiState.mucCurrentState==WINDOW_OPENSOURCE)
-			{
-				ui->mUiState.mucCurrentState=POP_ID_RESET_PASSWORD;
-				lv_obj_send_event(ui->mpEventStateSwitch,LV_EVENT_CLICKED,NULL);
-			}
-		}
-
-이런식으로 하고 있었거든
-
-3초 검사를 완료하고 static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED}; 로 설정을 해주던가 해야할 것 같아
+그러려면 어떻게 수정해야할까
