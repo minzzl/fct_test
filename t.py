@@ -99,27 +99,42 @@ void KeyEventTimer(lv_timer_t * timer)
 
 void LongPressKeyTimer(lv_timer_t * timer)
 {
-	lv_log("=============================== Both Keys are Long Pressed =======================\n");
-	if(Ui_GetInstance()->LongPressKeytimer)
-	{
-		while (timer == NULL);
-
-		KeyCode* keyLong=lv_timer_get_user_data(timer);
-		printf("KeyAction:%d,  KeyCode:%d, keyLong:%d\n", keyLong->KeyAction, keyLong->KeyCode, keyLong->Type);
-		lv_obj_send_event(Ui_GetInstance()->mpEventKeyWidget,LV_EVENT_CLICKED,keyLong);
-	
-		Ui_GetInstance()->bLongPressKeytimerLeftFlag = false;
-		Ui_GetInstance()->bLongPressKeytimerRightFlag = false;
-
-		lv_timer_delete(Ui_GetInstance()->LongPressKeytimer);
-		Ui_GetInstance()->LongPressKeytimer = NULL;
-
-		Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress = false;
-		Ui_GetInstance()->mUiKeyLongPress.RightKeyPress = false;
-
-		
-	}
+   // ★추가: 3초 경과 측정을 위한 정적 시작 시간
+   static uint32_t s_lr_start_ms = 0;
+   // 둘 다 계속 눌려있는지 확인 (연속 유지 조건)
+   if (!(Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress &&
+         Ui_GetInstance()->mUiKeyLongPress.RightKeyPress)) {
+       // 하나라도 떼졌으면 타이머 종료 및 초기화 (이벤트 미발생)
+       if (Ui_GetInstance()->LongPressKeytimer){
+           lv_timer_delete(Ui_GetInstance()->LongPressKeytimer);
+           Ui_GetInstance()->LongPressKeytimer = NULL;
+       }
+       s_lr_start_ms = 0;
+       return;
+   }
+   // 첫 진입(타이머가 처음 돌기 시작) 시각 기록
+   if (s_lr_start_ms == 0) {
+       s_lr_start_ms = lv_tick_get();
+       return; // 다음 틱부터 경과 검사
+   }
+   // 3초(3000ms) 이상 연속 유지되었는지 검사
+   if (lv_tick_elaps(s_lr_start_ms) >= 3000) {
+       lv_log("=============================== Both Keys are Long Pressed (>=3s) =======================\n");
+       KeyCode* keyLong = lv_timer_get_user_data(timer);
+       printf("KeyAction:%d,  KeyCode:%d, keyLong:%d\n",
+              keyLong->KeyAction, keyLong->KeyCode, keyLong->Type);
+       // 동시-롱 이벤트 전송
+       lv_obj_send_event(Ui_GetInstance()->mpEventKeyWidget, LV_EVENT_CLICKED, keyLong);
+       // 기존 플래그/타이머 정리 (개별 클릭 억제 효과 유지)
+       Ui_GetInstance()->bLongPressKeytimerLeftFlag  = false;
+       Ui_GetInstance()->bLongPressKeytimerRightFlag = false;
+       if (Ui_GetInstance()->LongPressKeytimer){
+           lv_timer_delete(Ui_GetInstance()->LongPressKeytimer);
+           Ui_GetInstance()->LongPressKeytimer = NULL;
+       }
+       // 개별 Release 시 클릭 안 나가도록 올-프레스 플래그도 원래대로 내림(기존 코드 유지)
+       Ui_GetInstance()->mUiKeyLongPress.LeftKeyPress  = false;
+       Ui_GetInstance()->mUiKeyLongPress.RightKeyPress = false;
+       s_lr_start_ms = 0; // 다음 사이클 대비 초기화
+   }
 }
-
-
-이 2개에서 변경점만 적용해서 줄래?
