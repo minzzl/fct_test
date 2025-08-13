@@ -138,3 +138,8 @@ void LongPressKeyTimer(lv_timer_t * timer)
        s_lr_start_ms = 0; // 다음 사이클 대비 초기화
    }
 }
+
+
+근데 좌우키가 눌러졌다는거는 static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED}; 로 판단을 하고 있어서 3초 검사가 의미 없는 것 같기도해 . 
+
+3초 검사를 완료하고 static KeyCode keyLong={1,KEY_LR_LONG,KEY_PRESSED}; 로 설정을 해주던가 해야할 것 같아
