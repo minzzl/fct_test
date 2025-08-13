@@ -122,4 +122,4 @@ void LongPressKeyTimer(lv_timer_t * timer)
 }
 
 
-아 확인해보니 이런게 있긴했어
+이 2개에서 변경점만 적용해서 줄래?
