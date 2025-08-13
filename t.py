@@ -1,113 +1,246 @@
-[Error] (2729313.087, +2729313087)       _lv_inv_area: Asserted at expression: !disp->rendering_in_progress (Invalidate area is not allowed during rendering.) lv_refr.c:257
-^[[A[Engine queue] : 108 Ready
+    fn decode_super5_page38to3c(&mut self, bytes: Bytes) -> Result<()> {
+        info!("*******************ODU super5 page38to3c decode is not implemented yet");
+
+        info!("addr: {}, product_code: {}", self.odu_addr, self.product_code);
+
+        let odu_data_sets = data_table()
+        .read()
+        .gets(DeviceType::Odu, self.address())
+        .unwrap_or_default();
+
+        let smart_plug_enable = odu_data_sets.get("smart_plug_enable") as f32;
+
+        info!(
+            "ODU super5 page38to3c decode: smart_plug_enable: {}",
+            smart_plug_enable
+        );
+
+        //smart_plug_enable 이 true 일 때만 해석함
+        if smart_plug_enable == 0.0 {
+            return Ok(());
+        }
+
+        let mut bytes = bytes;
+        let check_bytes = bytes.clone();
+
+        let byte0 = bytes.get_u8();
+        let length = byte0 & 0x7F;
+        if length != 0x40 {
+            return Err(anyhow!(
+                "ODU super5 page38to3c decode: invalid length: {length}"
+            ));
+        }
+
+        if bytes.remaining() < length as usize - 1 {
+            return Err(anyhow!("ODU super5 page38to3c decode: invalid length"));
+        }
+
+        let byte1 = bytes.get_u8();
+        let cmd = (byte1 >> 3) & 0x0F;
+        if cmd != 0xe {
+            return Err(anyhow!("ODU super5 page38to3c decode: invalid cmd: {cmd}"));
+        }
+
+        let byte2 = bytes.get_u8();
+        let byte3 = bytes.get_u8();
+        let byte4 = bytes.get_u8();
+        let byte5 = bytes.get_u8();
+        let byte6 = bytes.get_u8();
+        let byte7 = bytes.get_u8();
+        let byte8 = bytes.get_u8();
+        let byte9 = bytes.get_u8();
+        let byte10 = bytes.get_u8();
+        let byte11 = bytes.get_u8();
+        let byte12 = bytes.get_u8();
+        let byte13 = bytes.get_u8();
+        let byte14 = bytes.get_u8();
+        let byte15 = bytes.get_u8();
+        let byte16 = bytes.get_u8();
+        let byte17 = bytes.get_u8();
+        let byte18 = bytes.get_u8();
+        let byte19 = bytes.get_u8();
+        let byte20 = bytes.get_u8();
+        let byte21 = bytes.get_u8();
+        let byte22 = bytes.get_u8();
+        let byte23 = bytes.get_u8();
+        let byte24 = bytes.get_u8();
+        let byte25 = bytes.get_u8();
+        let byte26 = bytes.get_u8();
+        let byte27 = bytes.get_u8();
+        let byte28 = bytes.get_u8();
+        let byte29 = bytes.get_u8();
+        let byte30 = bytes.get_u8();
+        let byte31 = bytes.get_u8();
+        let byte32 = bytes.get_u8();
+        let byte33 = bytes.get_u8();
+        let byte34 = bytes.get_u8();
+        let byte35 = bytes.get_u8();
+        let byte36 = bytes.get_u8();
+        let byte37 = bytes.get_u8();
+        let byte38 = bytes.get_u8();
+        let byte39 = bytes.get_u8();
+        let byte40 = bytes.get_u8();
+        let byte41 = bytes.get_u8();
+        let byte42 = bytes.get_u8();
+        let byte43 = bytes.get_u8();
+        let byte44 = bytes.get_u8();
+        let byte45 = bytes.get_u8();
+        let byte46 = bytes.get_u8();
+        let _byte47 = bytes.get_u8();
+        let _byte48 = bytes.get_u8();
+        let _byte49 = bytes.get_u8();
+        let _byte50 = bytes.get_u8();
+        let _byte51 = bytes.get_u8();
+        let _byte52 = bytes.get_u8();
+        let _byte53 = bytes.get_u8();
+        let _byte54 = bytes.get_u8();
+        let _byte55 = bytes.get_u8();
+        let _byte56 = bytes.get_u8();
+        let _byte57 = bytes.get_u8();
+        let _byte58 = bytes.get_u8();
+        let _byte59 = bytes.get_u8();
+        let _byte60 = bytes.get_u8();
+        let _byte61 = bytes.get_u8();
+        let _byte62 = bytes.get_u8();
+        let byte63 = bytes.get_u8();
+
+        // byte 63
+        let checksum = byte63;
+        let expected_checksum = {
+            let mut sum: u32 = 0;
+            for byte in check_bytes[0..63].iter() {
+                sum += *byte as u32;
+            }
+            ((sum ^ 0x55) & 0xff) as u8
+        };
+
+        self.connection_checker.reset_disconnect_count();
+        let mut data_sets = DataSets::default();
+
+        if checksum != expected_checksum {
+            return Err(anyhow!(
+                "ODU CmdE super5 checksum error: {checksum} != {expected_checksum}"
+            ));
+        }
+
+        // byte 2
+        let recv_product_code = byte2;
+        if !(0xa0..=0xaf).contains(&recv_product_code) {
+            return Err(anyhow!("This msg is not for ACP"));
+        }
+
+        // byte 3
+        let product_code = byte3;
+        if !(0xc0..=0xcf).contains(&product_code) {
+            return Err(anyhow!(
+                "ODU CmdE super5 product code error: {product_code}"
+            ));
+        }
+
+        self.product_code = product_code;
+
+        // byte 4
+        let addr = byte4;
+        if addr != self.odu_addr {
+            return Err(anyhow!("ODU CmdE super5 addr error: {addr}"));
+        }
+
+        // byte 5
+        let _page = byte5;
+
+        // byte 10
+        let idu_count = byte as u32;
+        
+        
 
 
-앱 강제 종료 하려고 하면 이런 오류도 나는데 혹시 내가 고려해야했던게 있나?
 
-static void arc_set_start_exec(void * obj, int32_t v)
-{
-   // 각도 wrap
-   int32_t start = v % 360;
-   if(start < 0) start += 360;
-   int32_t end = start + 90;
-   if(end >= 360) end -= 360;
-   lv_arc_set_start_angle((lv_obj_t *)obj, start);
-   lv_arc_set_end_angle  ((lv_obj_t *)obj, end);
+
+
+
+        Ok(())
+    }
+      
 }
 
-void Create_DataLogging()
-{
-	lv_ui* ui = Ui_GetInstance();
-	ui->mpDataloggingPage = calloc(1, sizeof(ui_DataLogging));
-	if (ui->mpDataloggingPage == NULL) {
-		lv_log("%s\n","Failed to allocate ui->mpConnectAppPage");
-		return;
-	}
-	ui->mpDataloggingPage->mpPageWindowArea = CreatePageArea(ui->mpPageWindowArea);
-	ui->mpDataloggingPage->mpLayoutTitleText = CreateLayout(ui->mpDataloggingPage->mpPageWindowArea, LV_ALIGN_CENTER, TITLE_X_Y_HEIGHT_WIDTH);
-	lv_obj_align_to(ui->mpDataloggingPage->mpLayoutTitleText, ui->mpTopArea, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
-	ui->mpDataloggingPage->mpLabelDataLogging = CreateTitle(ui->mpDataloggingPage->mpLayoutTitleText, TR_TITLE_DATA_LOGGING);
-	lv_obj_set_style_text_font(ui->mpDataloggingPage->mpLabelDataLogging, &KR_FONT_24B, LV_PART_MAIN | LV_STATE_DEFAULT);
-	/* 공통: 배경 레이아웃 */
-	const lv_coord_t BOX_W = ui->isDataLoggingON ? 185 : 130;
-	ui->mpDataloggingPage->mpLayoutLoadingData = CreateLayout(ui->mpDataloggingPage->mpPageWindowArea, LV_ALIGN_CENTER, 0, 0, BOX_W, 40);
-	lv_obj_align_to(ui->mpDataloggingPage->mpLayoutLoadingData, ui->mpDataloggingPage->mpLayoutTitleText, LV_ALIGN_OUT_BOTTOM_MID, 0, 28);
-	/* 배경 스타일 */
-	lv_obj_set_style_bg_color(ui->mpDataloggingPage->mpLayoutLoadingData, lv_color_make(51, 51, 51), LV_PART_MAIN);
-	lv_obj_set_style_radius   (ui->mpDataloggingPage->mpLayoutLoadingData, 50, LV_PART_MAIN);
-	lv_obj_set_style_bg_opa   (ui->mpDataloggingPage->mpLayoutLoadingData, LV_OPA_COVER, LV_PART_MAIN);
-	lv_obj_set_style_border_width(ui->mpDataloggingPage->mpLayoutLoadingData, 0, LV_PART_MAIN);
-	/* 행 레이아웃 + 간격(아이콘-텍스트 사이 8px) */
-	lv_obj_set_flex_flow (ui->mpDataloggingPage->mpLayoutLoadingData, LV_FLEX_FLOW_ROW);
-	lv_obj_set_flex_align(ui->mpDataloggingPage->mpLayoutLoadingData,
-							LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-	lv_obj_set_style_pad_column(ui->mpDataloggingPage->mpLayoutLoadingData, 8, LV_PART_MAIN);
-	/* 아이콘 래퍼(고정 크기) */
-	const lv_coord_t WRAP = 24;   // 화면에 보여줄 고정 아이콘 크기
-	lv_obj_t *icon_wrap = lv_obj_create(ui->mpDataloggingPage->mpLayoutLoadingData);
-	lv_obj_remove_style_all(icon_wrap);
-	lv_obj_set_size(icon_wrap, WRAP, WRAP);
-	lv_obj_set_style_min_width (icon_wrap, WRAP, LV_PART_MAIN);
-	lv_obj_set_style_max_width (icon_wrap, WRAP, LV_PART_MAIN);
-	lv_obj_set_style_min_height(icon_wrap, WRAP, LV_PART_MAIN);
-	lv_obj_set_style_max_height(icon_wrap, WRAP, LV_PART_MAIN);
+이 코드에 // byte 10 에 실내기 대수가 있어. page에 따라 다르긴한데, 12개 혹은 13개이고 그 이후부터는 실내기 주소랑 누적전력이 전달되. 이거의 c 코드는 다음과 같아. 비슷하게 idu_count 에 따라서 값을 파싱하도록 코드를 추가해야해
 
-	if (ui->isDataLoggingON)
+int ProcessRxDataFromODUPage0_Smart(char *odu_addr, uchar *rs485buf_rx,psqlite3 pdb, int port)
+{
+	DEF_MON_ODU_CMDE_SMART_PLUG rcv_from_odu;
+	//char odu_type[30] = { 0, };
+	memcpy((char *) &rcv_from_odu, (char *) rs485buf_rx, 64);
+
+	int page = rcv_from_odu.page;
+	int i;
+	int addr;
+	unsigned int power = 0;
+	int idu_cnt_total = 0;
+	int idu_cnt_in_this_page = 0;
+	int current_or_accm = 0;		//1 순시 , 0 누적을 의미함.
+
+	if(page <= 0x37) //page 0x33 ~ 0x37 순시 소전량, page 0x38 ~ 0x3C 누적 소전량
+		current_or_accm = 1;
+
+	//사실 ODU가 page에 12 값을 줄 것 같긴 하지만 혹시 모르니까..
+//	if(page == 0x37 || page == 0x3C)
+//		idu_cnt = 12;
+
+	idu_cnt_total = rcv_from_odu.idu_count;
+
+	if (page == 0x33 || page == 0x38)
 	{
-		// (생략) mpLayoutLoadingData 스타일/플렉스, pad_column=8, icon_wrap(24x24) 생성은 기존 그대로
-		/* 90° 웻지를 그릴 arc (벡터) */
-		lv_obj_t *arc = lv_arc_create(icon_wrap);
-		lv_obj_remove_style_all(arc);
-		const lv_coord_t WRAP = 24;
-		lv_obj_set_size(arc, WRAP, WRAP);
-		lv_obj_center(arc);
-		lv_arc_set_bg_angles(arc, 0, 360);      
-		// 배경 트랙(옵션)
-		lv_obj_set_style_arc_color(arc, lv_color_make(120,120,120), LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_arc_opa  (arc, LV_OPA_40,                  LV_PART_MAIN | LV_STATE_DEFAULT);
-		lv_obj_set_style_arc_width(arc, 3,                           LV_PART_MAIN | LV_STATE_DEFAULT);
-		// 인디케이터(실제로 보이는 90° 웻지)
-		lv_obj_set_style_arc_color  (arc, lv_color_white(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-		lv_obj_set_style_arc_opa    (arc, LV_OPA_COVER,     LV_PART_INDICATOR | LV_STATE_DEFAULT);
-		lv_obj_set_style_arc_width  (arc, 3,                LV_PART_INDICATOR | LV_STATE_DEFAULT);
-		lv_obj_set_style_arc_rounded(arc, true,             LV_PART_INDICATOR | LV_STATE_DEFAULT);
-		// 조작 비활성
-		lv_arc_set_mode(arc, LV_ARC_MODE_NORMAL);
-		lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
-		// 초기 각도: 0~90 (항상 90° 유지)
-		lv_arc_set_start_angle(arc, 0);
-		lv_arc_set_end_angle  (arc, 90);
-		// 애니메이션: 시작각을 0→360으로 부드럽게 회전
-		lv_anim_t a;
-		lv_anim_init(&a);
-		lv_anim_set_var(&a, arc);
-		lv_anim_set_exec_cb(&a, arc_set_start_exec);  // ← 전역 콜백 사용
-		lv_anim_set_values(&a, 0, 360);
-		lv_anim_set_time(&a, 1000);                   // 1회전 1000ms
-		lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-		lv_anim_set_path_cb(&a, lv_anim_path_linear);
-		lv_anim_start(&a);
-		ui->mpDataloggingPage->mpLoaderImage = arc;
-		// 텍스트 (pad_column으로 간격 유지)
-		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped =
-			CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_LOGGING_DATA, LV_ALIGN_CENTER, 0, 0);
-		}
+		if (idu_cnt_total <= 13)
+			idu_cnt_in_this_page = idu_cnt_total;
+		else
+			idu_cnt_in_this_page = 13;
+	}
+	else if (page == 0x34 || page == 0x39)
+	{
+		if (idu_cnt_total <= 26)
+			idu_cnt_in_this_page = idu_cnt_total - 13;
+		else
+			idu_cnt_in_this_page = 13;
+	}
+	else if (page == 0x35 || page == 0x3A)
+	{
+		if (idu_cnt_total <= 39)
+			idu_cnt_in_this_page = idu_cnt_total - 26;
+		else
+			idu_cnt_in_this_page = 13;
+	}
+	else if (page == 0x36 || page == 0x3B)
+	{
+		if (idu_cnt_total <= 52)
+			idu_cnt_in_this_page = idu_cnt_total - 39;
+		else
+			idu_cnt_in_this_page = 13;
+	}
+	else if (page == 0x37 || page == 0x3C)
+	{
+		if (idu_cnt_total <= 64)
+			idu_cnt_in_this_page = idu_cnt_total - 52;
+		else
+			idu_cnt_in_this_page = 12;
+	}
 	else
+		printf("Not supported page!!!\n");
+
+
+	for(i=0; i<idu_cnt_in_this_page; i++)
 	{
-		/* ───────── 정지 상태: 비트맵 ───────── */
-		extern const lv_img_dsc_t ic_status_stop;
-		lv_obj_t *stop_img = CreateImage(icon_wrap, &ic_status_stop, LV_ALIGN_CENTER, 0, 0);
-		ui->mpDataloggingPage->mpLoaderImage = stop_img;
-		ui->mpDataloggingPage->mpLabelLogging_OR_Stopped =
-			CreateText(ui->mpDataloggingPage->mpLayoutLoadingData, TR_STOPPED_LOGGING, LV_ALIGN_CENTER, 0, 0);
+		addr = rcv_from_odu.idu_info[i].idu_addr;
+		power = (rcv_from_odu.idu_info[i].idu_power_upper << 16 ) | (rcv_from_odu.idu_info[i].idu_power_middle << 8 ) | (rcv_from_odu.idu_info[i].idu_power_lower);
+
+		//pinfo 에다가만 값을 써놓으면 pwrdist 가 알아서 디비에 적는다.
+
+		if(current_or_accm)		// 순시
+			pinfo->monitor.pdi[addr].pwrInst = power;
+		else
+			pinfo->monitor.pdi[addr].pwrAccm = power;
+
 	}
-	/* 하단 안내 텍스트 버튼 영역 */
-	ui->mpDataloggingPage->mpLayoutTextBtn =
-		CreateLayout(ui->mpDataloggingPage->mpPageWindowArea, LV_ALIGN_CENTER, 0, 0, 258, 83);
-	lv_obj_align_to(ui->mpDataloggingPage->mpLayoutTextBtn,
-					ui->mpDataloggingPage->mpLayoutTitleText, LV_ALIGN_OUT_BOTTOM_MID, 0, 84);
-	ui->mpDataloggingPage->mpLabelKeyPress =
-		CreateImageText(ui->mpDataloggingPage->mpLayoutTextBtn,
-						(ui->isDataLoggingON ? TR_O_PRESS_STOP_LOGGING : TR_O_PRESS_START_LOGGING),
-						LV_ALIGN_CENTER, 0, 0);
+	return 0;
 }
+
+나는 0x38 ~ 3c까지만 확인하면 돼.
