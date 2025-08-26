@@ -1,19 +1,3 @@
-minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~/Downloads$ dpkg -L vsclient-linux | grep bin
-/opt/VD-i/bin
-/opt/VD-i/bin/imageformats
-/opt/VD-i/bin/imageformats/libqgif.so
-/opt/VD-i/bin/imageformats/libqico.so
-/opt/VD-i/bin/imageformats/libqjpeg.so
-/opt/VD-i/bin/imageformats/libqsvg.so
-/opt/VD-i/bin/multimedia
-/opt/VD-i/bin/multimedia/libffmpegmediaplugin.so
-/opt/VD-i/bin/multimedia/libgstreamermediaplugin.so
-/opt/VD-i/bin/platforms
-/opt/VD-i/bin/platforms/libqxcb.so
-/opt/VD-i/bin/tls
-/opt/VD-i/bin/tls/libqcertonlybackend.so
-/opt/VD-i/bin/tls/libqopensslbackend.so
-/opt/VD-i/bin/update.sh
-/opt/VD-i/bin/vsclient-1.4.131.27756
-/opt/VD-i/bin/vsclient
-minzzl@minzzl-HP-Z6-G5-Wor
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~/Downloads$ journalctl -f 
+Aug 26 11:57:53 minzzl-HP-Z6-G5-Workstation-Desktop-PC citrix-ctxcwalogd[1464]: Failed to open "/log/citrix/ICAClient.log" for output: No such file or directory.
+Aug 26 11:57:53 minzzl-HP-Z6-G5-Workstation-Desktop-PC citrix-ctxcwalogd[1464]: Failed to open new output path, continuing to log to old path.
