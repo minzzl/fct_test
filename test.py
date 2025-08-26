@@ -1,5 +1,19 @@
-minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~/Downloads$ journalctl -f | grep vsclient
-Aug 26 11:54:02 minzzl-HP-Z6-G5-Workstation-Desktop-PC citrix-ctxcwalogd[1464]: Process 7408 has named itself "citrix-vsclient".
-^C
-minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~/Downloads$ GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb /opt/*/vsclient 2>&1 | tee /tmp/vsclient.x11.log
-bash: /opt/*/vsclient: No such file or directory
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~/Downloads$ dpkg -L vsclient-linux | grep bin
+/opt/VD-i/bin
+/opt/VD-i/bin/imageformats
+/opt/VD-i/bin/imageformats/libqgif.so
+/opt/VD-i/bin/imageformats/libqico.so
+/opt/VD-i/bin/imageformats/libqjpeg.so
+/opt/VD-i/bin/imageformats/libqsvg.so
+/opt/VD-i/bin/multimedia
+/opt/VD-i/bin/multimedia/libffmpegmediaplugin.so
+/opt/VD-i/bin/multimedia/libgstreamermediaplugin.so
+/opt/VD-i/bin/platforms
+/opt/VD-i/bin/platforms/libqxcb.so
+/opt/VD-i/bin/tls
+/opt/VD-i/bin/tls/libqcertonlybackend.so
+/opt/VD-i/bin/tls/libqopensslbackend.so
+/opt/VD-i/bin/update.sh
+/opt/VD-i/bin/vsclient-1.4.131.27756
+/opt/VD-i/bin/vsclient
+minzzl@minzzl-HP-Z6-G5-Wor
