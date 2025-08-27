@@ -1,0 +1,371 @@
+좋아! 주신 HTML처럼 “표+링크+문단”이 섞인 공지 파일을 경량 파서(방법 1) 로 ‘읽기 좋은 텍스트’로 바꿔서 LVGL 라벨에 넣을 수 있도록, 아래처럼 태그 제거/치환 + 표 행/셀 구성 + 엔티티 디코딩을 해주는 변환기를 붙였습니다.
+핵심은 <table><tr><th|td>를 만나면 행 단위로 셀1 | 셀2 | 셀3 형태로 만들고, <p>/<div>/<h1..h6>/<br>은 개행 처리, <li>는 불릿으로 바꾸는 것입니다. 스크립트/스타일은 통째로 스킵합니다.
+
+아래 코드 그대로 붙여 넣고, 기존 Create_PopUp_Open_Source_License()를 대체하면 됩니다.
+(표시 폭에 따른 줄바꿈까지 정밀하게 반영하고 싶으면, 마지막 주석처럼 lv_txt_get_size() 기반으로 페이지 분할만 추가로 개선하면 돼요.)
+
+⸻
+
+1) HTML → 텍스트 변환기 (표/링크/엔티티 처리 포함)
+
+#include <ctype.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// ---------- 작은 유틸 ----------
+static void buf_putc(char** out, size_t* cap, size_t* len, char c){
+    if (*len + 2 >= *cap){
+        *cap = (*cap==0? 2048 : (*cap*2));
+        *out = (char*)realloc(*out, *cap);
+    }
+    (*out)[(*len)++] = c;
+    (*out)[*len] = '\0';
+}
+static void buf_puts(char** out, size_t* cap, size_t* len, const char* s){
+    while(*s) buf_putc(out, cap, len, *s++);
+}
+static void rtrim_newlines(char* s){
+    size_t n = strlen(s);
+    while(n && (s[n-1]=='\n' || s[n-1]==' ' || s[n-1]=='\t')) n--;
+    s[n] = '\0';
+}
+static int ieq(const char* a, const char* b){ return strcasecmp(a,b)==0; }
+
+// ---------- HTML 엔티티 (기본형) ----------
+static void decode_entity(const char* ent, char** out, size_t* cap, size_t* len){
+    if      (strcmp(ent,"amp")==0)  buf_putc(out,cap,len,'&');
+    else if (strcmp(ent,"lt")==0)   buf_putc(out,cap,len,'<');
+    else if (strcmp(ent,"gt")==0)   buf_putc(out,cap,len,'>');
+    else if (strcmp(ent,"quot")==0) buf_putc(out,cap,len,'"');
+    else if (strcmp(ent,"apos")==0) buf_putc(out,cap,len,'\'');
+    else if (strcmp(ent,"nbsp")==0) buf_putc(out,cap,len,' ');
+    else if (ent[0]=='#'){ // 숫자 엔티티
+        long code = 0;
+        if (ent[1]=='x' || ent[1]=='X') code = strtol(ent+2,NULL,16);
+        else                            code = strtol(ent+1,NULL,10);
+        if (code>0 && code<128) buf_putc(out,cap,len,(char)code);
+        // (필요하면 UTF-8 인코딩 확장)
+    }
+}
+
+// ---------- 표 변환 상태 ----------
+typedef struct {
+    bool in_table;
+    bool in_row;
+    bool in_cell;
+    bool in_headcell;
+    bool first_cell_in_row;
+    // 셀 내용 임시 버퍼
+    char* cell; size_t cell_cap; size_t cell_len;
+} table_state;
+
+static void cell_reset(table_state* ts){
+    ts->cell_len = 0;
+    if (!ts->cell){ ts->cell_cap = 256; ts->cell = (char*)malloc(ts->cell_cap); }
+    ts->cell[0] = '\0';
+}
+static void cell_putc(table_state* ts, char c){
+    if (ts->cell_len + 2 >= ts->cell_cap){
+        ts->cell_cap *= 2;
+        ts->cell = (char*)realloc(ts->cell, ts->cell_cap);
+    }
+    ts->cell[ts->cell_len++] = c;
+    ts->cell[ts->cell_len] = '\0';
+}
+static void cell_puts(table_state* ts, const char* s){ while(*s) cell_putc(ts,*s++); }
+
+// ---------- 메인: HTML → 텍스트 ----------
+char* html_to_text_oss(const char* html){
+    size_t cap=0,len=0; char* out=NULL;
+    bool in_tag=false, skip_block=false, in_entity=false;
+    char tagbuf[256]; int tlen=0;
+    char entbuf[64];  int elen=0;
+
+    // 리스트 상태
+    bool in_li=false;
+
+    // 표 상태
+    table_state ts = {0};
+
+    // 도우미: 문단/제목/블록 개행
+    auto void ensure_newline(void){
+        if (len==0 || out[len-1]=='\n') return;
+        buf_putc(&out,&cap,&len,'\n');
+    };
+
+    for(const char* p=html; *p; ++p){
+        char c = *p;
+
+        // 엔티티
+        if (in_entity){
+            if (c==';' || elen >= (int)sizeof(entbuf)-2){
+                entbuf[elen]='\0';
+                if (ts.in_cell) decode_entity(entbuf,&ts.cell,&ts.cell_cap,&ts.cell_len);
+                else            decode_entity(entbuf,&out,&cap,&len);
+                in_entity=false;
+            }else if(!isspace((unsigned char)c)){
+                entbuf[elen++]=c;
+            }else{
+                in_entity=false;
+            }
+            continue;
+        }
+        if (c=='&'){ in_entity=true; elen=0; continue; }
+
+        // 태그 파싱
+        if (in_tag){
+            if (c=='>' || tlen >= (int)sizeof(tagbuf)-2){
+                tagbuf[tlen]='\0'; in_tag=false;
+
+                // 태그 이름/종료여부 추출
+                char name[64]; int i=0,j=0; bool closing=false;
+                while(tagbuf[i] && isspace((unsigned char)tagbuf[i])) i++;
+                if (tagbuf[i]=='/'){ closing=true; i++; }
+                while(tagbuf[i] && !isspace((unsigned char)tagbuf[i]) && tagbuf[i]!='/'){
+                    if (j<(int)sizeof(name)-1) name[j++] = (char)tolower((unsigned char)tagbuf[i]);
+                    i++;
+                }
+                name[j]='\0';
+
+                // 스크립트/스타일 스킵
+                if (!closing && (ieq(name,"script")||ieq(name,"style"))) { skip_block=true; continue; }
+                if (closing && (ieq(name,"script")||ieq(name,"style")))   { skip_block=false; continue; }
+                if (skip_block) continue;
+
+                // 표 핸들링
+                if (ieq(name,"table")){
+                    if (!closing){ ts.in_table=true; }
+                    else { ts.in_table=false; }
+                }else if (ieq(name,"tr")){
+                    if (!closing){
+                        ts.in_row=true; ts.first_cell_in_row=true;
+                    }else{
+                        ts.in_row=false;
+                        // 행 끝 개행
+                        ensure_newline();
+                    }
+                }else if (ieq(name,"th") || ieq(name,"td")){
+                    if (!closing){
+                        ts.in_cell = true;
+                        ts.in_headcell = ieq(name,"th");
+                        cell_reset(&ts);
+                        // 셀 구분자
+                        if (!ts.first_cell_in_row) buf_puts(&out,&cap,&len," | ");
+                        ts.first_cell_in_row=false;
+                    }else{
+                        // 셀 종료 → 셀 내용 flush(리드미하게 공백 정리)
+                        rtrim_newlines(ts.cell);
+                        // 연속 공백 정리(필요 최소화)
+                        for(size_t k=0;k<ts.cell_len;k++){
+                            char cc = ts.cell[k];
+                            if (cc=='\r') continue;
+                            if (cc=='\n') cc=' ';
+                            buf_putc(&out,&cap,&len,cc);
+                        }
+                        ts.in_cell=false; ts.in_headcell=false;
+                    }
+                }
+                // 블록성/개행 태그
+                else if (ieq(name,"br")){
+                    if (ts.in_cell) cell_putc(&ts,'\n'); else buf_putc(&out,&cap,&len,'\n');
+                }else if (ieq(name,"p") || ieq(name,"div") || ieq(name,"section")){
+                    if (!closing){ /* do nothing */ }
+                    else { ensure_newline(); }
+                }else if (ieq(name,"h1")||ieq(name,"h2")||ieq(name,"h3")||ieq(name,"h4")||ieq(name,"h5")||ieq(name,"h6")){
+                    if (!closing){ /* start */ }
+                    else { ensure_newline(); }
+                }else if (ieq(name,"li")){
+                    if (!closing){ in_li=true; if (ts.in_cell) cell_puts(&ts,"• "); else buf_puts(&out,&cap,&len,"• "); }
+                    else { in_li=false; ensure_newline(); }
+                }
+                // a/span/strong/b 등은 텍스트만 유지
+                // caption 등은 무시 (이미 th/td로 충분)
+                continue;
+            }else{
+                tagbuf[tlen++]=c; continue;
+            }
+        }
+
+        if (c=='<'){ in_tag=true; tlen=0; continue; }
+        if (skip_block) continue;
+
+        // 일반 텍스트 누적
+        if (ts.in_cell){
+            if (c=='\r') continue;
+            if (c=='\n'){ cell_putc(&ts, in_li ? ' ' : '\n'); }
+            else { cell_putc(&ts,c); }
+        }else{
+            if (c=='\r') continue;
+            if (c=='\n'){ buf_putc(&out,&cap,&len, in_li ? ' ' : '\n'); }
+            else { buf_putc(&out,&cap,&len,c); }
+        }
+    }
+
+    if (!out) out=strdup("");
+    // 말미 정리
+    rtrim_newlines(out);
+    // 셀 버퍼 해제
+    free(ts.cell);
+    return out;
+}
+
+
+⸻
+
+2) 팝업 함수: 전체 파일 읽고 변환 → 페이지 계산/표시
+
+#ifndef MAX_LINES_PER_PAGE
+#define MAX_LINES_PER_PAGE 18  // UI에 맞게 조절
+#endif
+
+// 내부 저장용(전체 텍스트, 현재 페이지)
+typedef struct {
+    char* full_text;
+    int   total_lines;
+    int   total_pages;
+    int   page_index;
+} OpenSrcPager;
+
+static char* slice_page_by_lines(const char* full, int page, int max_lines){
+    int target_start_line = page * max_lines;
+    int cur_line = 0;
+    const char* start = full;
+    const char* p = full;
+
+    // 시작 지점 찾기
+    if (target_start_line>0){
+        for(; *p && cur_line < target_start_line; ++p){
+            if (*p=='\n') cur_line++;
+        }
+        start = p;
+    }
+
+    // 끝 지점 찾기
+    int kept = 0;
+    for(; *p && kept < max_lines; ++p){
+        if (*p=='\n') kept++;
+    }
+    size_t n = (size_t)(p - start);
+    char* out = (char*)malloc(n + 1);
+    memcpy(out, start, n);
+    out[n]='\0';
+    return out;
+}
+
+void Create_PopUp_Open_Source_License(void){
+    lv_ui* ui = Ui_GetInstance();
+    CreatePopupWindow(POP_ID_OPEN_SOURCE_LICENSE);
+
+    // 파일 전체 읽기
+    FILE* f = fopen(OPENSOURCE_LICENSE, "rb");
+    if (!f){ printf("Failed to open openSource\n"); return; }
+    fseek(f,0,SEEK_END); long sz = ftell(f); fseek(f,0,SEEK_SET);
+    char* html = (char*)malloc(sz+1);
+    if (!html){ fclose(f); return; }
+    fread(html,1,sz,f); html[sz]='\0'; fclose(f);
+
+    // HTML → 텍스트
+    char* plain = html_to_text_oss(html);
+    free(html);
+
+    // 총 줄 수/페이지 수
+    int total_lines = 0;
+    if (*plain){
+        for (const char* q=plain; *q; ++q) if (*q=='\n') total_lines++;
+        if (plain[strlen(plain)-1] != '\n') total_lines++;
+    }
+    int total_pages = (total_lines + MAX_LINES_PER_PAGE - 1) / MAX_LINES_PER_PAGE;
+    if (total_pages<=0) total_pages = 1;
+
+    // 첫 페이지 텍스트
+    char* page_text = slice_page_by_lines(plain, 0, MAX_LINES_PER_PAGE);
+
+    // 데이터 주입
+    ui->mpPopupPage->mPopData.OpenSource = page_text;
+    ui->mpPopupPage->mPopData.mucPageTotalCount = total_pages;
+    ui->mpPopupPage->mPopData.mucPageIndex = 0; // 현재 페이지(0-based)
+
+    // 전체 텍스트 저장을 위해 구조체에 한 칸 마련해두세요(예: mPopData.pFullText)
+    ui->mpPopupPage->mPopData.pFullText = plain; // << 구조체에 char* 필드 추가 필요
+
+    // 버튼 매트릭스
+    ui->mpPopupPage->mPopData.BtnMatrixMap = calloc(4,sizeof(char*));
+    ui->mpPopupPage->mPopData.BtnMatrixMap[0] = strdup(textData[TR_PREV]);
+    ui->mpPopupPage->mPopData.BtnMatrixMap[1] = strdup(textData[TR_CLOSE]);
+    ui->mpPopupPage->mPopData.BtnMatrixMap[2] = strdup(textData[TR_NEXT_BUTTON]);
+    ui->mpPopupPage->mPopData.BtnMatrixMap[3] = strdup("");
+
+    PopOpensource(&ui->mpPopupPage->mPopData);
+    lv_obj_add_event_cb(ui->mpPopupPage->mpBtnMatrix, EventPopUpProc, LV_EVENT_CLICKED, NULL);
+}
+
+
+⸻
+
+3) 다음/이전 버튼에서 페이지 전환
+
+EventPopUpProc 안에서 (개념):
+
+// 예시 헬퍼
+static void OpenSrc_GotoPage(lv_ui* ui, int new_index){
+    if (new_index < 0) new_index = 0;
+    if (new_index >= ui->mpPopupPage->mPopData.mucPageTotalCount)
+        new_index = ui->mpPopupPage->mPopData.mucPageTotalCount - 1;
+
+    if (new_index == ui->mpPopupPage->mPopData.mucPageIndex) return;
+
+    char* new_txt = slice_page_by_lines(ui->mpPopupPage->mPopData.pFullText,
+                                        new_index, MAX_LINES_PER_PAGE);
+
+    free(ui->mpPopupPage->mPopData.OpenSource);
+    ui->mpPopupPage->mPopData.OpenSource = new_txt;
+    ui->mpPopupPage->mPopData.mucPageIndex = new_index;
+
+    // 라벨에 텍스트 반영 (당신의 구현에 맞게 호출)
+    update_popup_label_text(&ui->mpPopupPage->mPopData);
+}
+
+// 버튼 이벤트(개략)
+void EventPopUpProc(lv_event_t* e){
+    lv_obj_t* obj = lv_event_get_target(e);
+    lv_ui* ui = Ui_GetInstance();
+    uint16_t id = lv_btnmatrix_get_selected_btn(obj);
+    const char* txt = lv_btnmatrix_get_btn_text(obj, id);
+
+    if (strcmp(txt, textData[TR_NEXT_BUTTON])==0){
+        OpenSrc_GotoPage(ui, ui->mpPopupPage->mPopData.mucPageIndex + 1);
+    }else if (strcmp(txt, textData[TR_PREV])==0){
+        OpenSrc_GotoPage(ui, ui->mpPopupPage->mPopData.mucPageIndex - 1);
+    }else if (strcmp(txt, textData[TR_CLOSE])==0){
+        // 닫기 처리
+    }
+}
+
+
+⸻
+
+변환 결과 느낌 (주신 파일 일부 기준)
+
+Open Source Software Notice
+OSSNotice-7131_ACP i_1.00.0_250821.html
+
+This product from LG Electronics, Inc. contains the open source software detailed below. Please refer to the indicated open source licenses (as are included following this notice) for the terms and conditions of their use.
+
+Open Source | License | Copyright
+acl 2.3.1 | GPL-2.0 | LGPL-2.1 | (C) 1999 Andreas Gruenbacher, <a.gruenbacher@computer.org>
+attr 2.5.1 | GPL-2.0 | Copyright (c) 2009 Andreas...
+...
+
+	•	<span>/<strong> 등은 텍스트만 유지
+	•	<a>는 링크 텍스트만 남기고 URL은 생략 (원하면 [텍스트](URL) 형태로 바꾸도록 간단히 확장 가능)
+	•	표는 셀1 | 셀2 | 셀3 행 단위로 직관적으로 보이게 변환
+
+⸻
+
+팁 (선택사항)
+	•	폭 기반 정확한 페이지 나누기: lv_txt_get_size()로 현재 라벨 폭에서 실제 줄 수를 얻어가며 페이지를 자르면, 라벨의 자동 줄바꿈까지 반영됩니다. 지금 코드는 “개행 기준”이므로 텍스트가 길어 자동 래핑되면 화면상 줄 수와 차이가 날 수 있어요. 필요하면 그 부분도 같이 넣어줄게요.
+	•	링크 URL 표시를 원하면, <a ... href="...">text</a> 태그를 만났을 때 셀/텍스트에 text (URL)을 집어넣도록 in_tag 처리에서 href 속성을 파싱해 주면 됩니다.
+
+원하는 표시 스타일(예: 링크에 URL도 표시, 표의 열 구분자 변경, 헤더에 구분선 넣기 등)이 있으면 말해줘. 그에 맞게 변환기 규칙을 더 다듬어 줄게!
