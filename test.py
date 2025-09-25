@@ -74,7 +74,6 @@ CFG_TEMPLATE = BASE_DIR / "new_cfg.yml"       # 신규
 current_row_index = 0
 # ────────── 유틸 함수들 ───────────────────────────────
 
-
 def provision_key_after_fct(ip, user, pwd="allnewb2b^^"):
    """FCT 성공 시에만 수행: /lg_rw/etc/key → sysfs로 적용 후 원본 삭제"""
    log("[...] Apply device key")
@@ -110,7 +109,7 @@ def provision_key_after_fct(ip, user, pwd="allnewb2b^^"):
        return True
    except Exception as e:
        log(f"[x] Key provision err: {e}")
-       return Fals
+       return False
 
 
 def remove_known_host(path, ip):
@@ -343,13 +342,3 @@ root.protocol("WM_DELETE_WINDOW", on_close)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 root.mainloop()
-
-
-
-이 코드를
-
-pyinstaller --onefile --noconsole --name lg_fct_gui --collect-all cryptography.hazmat.bindings._rust gui_fct.py
-
-이런식으로 해서 프로그램을 만들었는데, 왜인지는 모르겠지만 가끔가다 확인 버튼울 누른게 잘 전달이 안되고 다시 버튼을 누른게 전달이 잘안되고 그러는것 같아.
-이유는 잘 모르겠어. 이게 언제 일어나는건지도 모르겠고
-혹시 그럴 수 있는 포인트가 있을까? 있다면 수정해줘
