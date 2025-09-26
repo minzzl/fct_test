@@ -342,3 +342,5 @@ root.protocol("WM_DELETE_WINDOW", on_close)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 root.mainloop()
+
+이 코드에서 입력 받는 부분에 창이 뜨도록 했는데, 가끔 창이 2번 뜬다거나, 내가 누른 버튼이 제대로 의도에 맞게 입력이 안된다거나 하는 문제 가 생기는데 어떻게 해걀할 수 있을까
