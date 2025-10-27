@@ -1,7 +1,56 @@
-지식 확산과 협업 기반 강화 부분에 조금 더 중점적으로 작성을 하고 싶어. 
+minzzl@minzzl-HP-Z6-G5-Workstation-Desktop-PC:~/Code/tool.fata_test$ python3 run_sota_memory_test.py --app-path test_data/com.acp.lcd_1.0.0_all_signed.ipk --app-id com.acp.lcd --app-version 1.0.0 --iteration 3 --ip 10.175.195.66  --expected-rss-mib 120
+==================================================
+      App Install/Uninstall Test Initialized
+==================================================
+  - App ID: com.acp.lcd
+  - App Version: 1.0.0
+  - App Path: test_data/com.acp.lcd_1.0.0_all_signed.ipk
+  - Total Iterations: 3
+==================================================
 
-일단 증거 자료로 내가 콜랩 문서 정리한거랑, 발표 자료를 첨부할 거고.. 
-이거를 준비하면서 내가 webos에 자체에 대해서 내부 동작이 어떻게 되는지, 그리고 b2b 플랫폼 자체가 왜 필요한지를 상세히 알린거고 ... 
+---------- [ Iteration 1/3 ] ----------
 
-cto분들이랑은 매주 싱크업 회의를 통해 문제 사항을 알리고 지원요청을 받거나 했어. 예를 들어 저기에 적은 wifi 이슈도 내가 리포트 함으로써 cto 쪽에서 webos 의 문제 기능을 인지하고 후속처리해줬고, 그 외에도 일부 luna-api 의 작동방식이나, 그런 사소한 질문들을 하면서 정말 webos 자체에 가까워지는 한해였어. 
-factory Reset 공통 시나리오 구현은 webos 측면에서 제공되는 기능이었지만, 내가 우리 b2b 플랫폼에 맞게 수정을 했어. 즉 cto 에서 개발한 webos 는 기본적인 factory reset 기능을 제공했는데, 우리 es 사업부의 중앙 제어기 관점에 맞게 수정을 한거지.
+[MEM] SAFE | Avail=11007MiB / Total=31730MiB (Warn=4759, Crit=1586, Need=220) | SwapFree=4806MiB
+[INFO] Initiating application installation for 'com.acp.lcd' (Version: 1.0.0)
+[SUCCESS] Application installation request sent successfully. Status: 200
+[INFO] Verifying application 'com.acp.lcd' status. Expected: 'ok'
+[PASS] Verification successful. Received status: 'ok'
+[INFO] App RSS after install: [29] MiB
+--------------------
+[INFO] Initiating application uninstallation for 'com.acp.lcd'
+[SUCCESS] Application uninstallation request sent successfully. Status: 200
+[INFO] Verifying application 'com.acp.lcd' status. Expected: 'err'
+[PASS] Verification successful. Received status: 'err'
+
+
+---------- [ Iteration 2/3 ] ----------
+
+[MEM] SAFE | Avail=11209MiB / Total=31730MiB (Warn=4759, Crit=1586, Need=220) | SwapFree=4806MiB
+[INFO] Initiating application installation for 'com.acp.lcd' (Version: 1.0.0)
+[SUCCESS] Application installation request sent successfully. Status: 200
+[INFO] Verifying application 'com.acp.lcd' status. Expected: 'ok'
+[PASS] Verification successful. Received status: 'ok'
+[INFO] App RSS after install: [29] MiB
+--------------------
+[INFO] Initiating application uninstallation for 'com.acp.lcd'
+[SUCCESS] Application uninstallation request sent successfully. Status: 200
+[INFO] Verifying application 'com.acp.lcd' status. Expected: 'err'
+[PASS] Verification successful. Received status: 'err'
+
+
+---------- [ Iteration 3/3 ] ----------
+
+[MEM] SAFE | Avail=11195MiB / Total=31730MiB (Warn=4759, Crit=1586, Need=220) | SwapFree=4806MiB
+[INFO] Initiating application installation for 'com.acp.lcd' (Version: 1.0.0)
+[SUCCESS] Application installation request sent successfully. Status: 200
+[INFO] Verifying application 'com.acp.lcd' status. Expected: 'ok'
+[PASS] Verification successful. Received status: 'ok'
+[INFO] App RSS after install: [29] MiB
+--------------------
+[INFO] Initiating application uninstallation for 'com.acp.lcd'
+[SUCCESS] Application uninstallation request sent successfully. Status: 200
+[INFO] Verifying application 'com.acp.lcd' status. Expected: 'err'
+[PASS] Verification successful. Received status: 'err'
+
+메모리가 다음과 같이 관측이 될때, 우리가 진짜 가용 메모리 한계치에서 테스트하려면 어떻게 해야할까
+
