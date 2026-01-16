@@ -1,225 +1,183 @@
-/// 저장된 History를 'count'만큼 불러옵니다. 가장 최신의 History부터 불러옵니다.
-    pub fn get_record(&mut self, filter: &HistoryFilter) -> Result<HistoryInfo> {
-        // count가 설정되지 않았을 때는 200개로 설정합니다.
-        // 시스템에 과도한 부하를 방지하기 위함입니다.
-        let mut count = filter.count.unwrap_or(1000);
-        if count > 1000 {
-            warn!("Count is over 1000. Set count to 1000.");
-            count = 1000;
+pub(crate) async fn get_histories_csv(
+        params: HistoryOptions,
+        token: Option<String>,
+    ) -> Result<impl warp::Reply, warp::Rejection> {
+        if !access_control()
+            .check_permission(token.as_deref(), Permission::GetHistory)
+            .await
+        {
+            return Ok(Response::err("Permission denied".to_string()));
         }
-        let page = filter.page.unwrap_or(0);
 
-        let histories = mem::take(&mut self.histories);
-        if !histories.is_empty() {
-            let histories: Vec<HistoryRecord> = histories
-                .into_iter()
-                .filter_map(|h| match HistoryRecord::try_from(h) {
-                    Ok(record) => Some(record),
-                    Err(e) => {
-                        error!("Failed to convert History to HistoryRecord: {e}");
-                        None
-                    }
-                })
-                .collect();
+        // Initialize variables for pagination
+        let mut histories_records = vec![];
 
-            if let Err(e) = db::save_histories(&histories) {
-                error!("Failed to save histories: {e}");
-            }
-        }
-        self.clear_cached();
-
-        // NOTE: 직접 메모리 상에서 조회하는 것 없이 모두 DB에서 조회합니다.
-        let mut complex_queries = ComplexQueries {
-            query_type: QueryType::And,
-            queries: vec![],
-        };
-
-        let mut queries = Queries {
-            query_type: QueryType::And,
-            queries: vec![],
-        };
-
-        if let Some(timestamp) = filter.timestamp {
-            queries.queries.push(Query {
-                prop: "timestamp".to_string(),
-                op: ">=".parse().unwrap(),
-                value: timestamp.time_from.unwrap_or(0).into(),
-            });
-            queries.queries.push(Query {
-                prop: "timestamp".to_string(),
-                op: "<=".parse().unwrap(),
-                value: timestamp.time_to.unwrap_or(i64::MAX).into(),
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        for event in &filter.event {
-            let event = match serde_json::to_value(event) {
-                Ok(event) => event,
-                Err(e) => {
-                    error!("Failed to serialize event: {e}");
-                    continue;
-                }
-            };
-
-            queries.queries.push(Query {
-                prop: "event".to_string(),
-                op: "=".parse().unwrap(),
-                value: event,
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        for id in &filter.facility_id {
-            queries.queries.push(Query {
-                prop: "facilityId".to_string(),
-                op: "=".parse().unwrap(),
-                value: id.facility.into(),
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        for facility_type in &filter.facility_type {
-            queries.queries.push(Query {
-                prop: "facilityType".to_string(),
-                op: "=".parse().unwrap(),
-                value: facility_type.as_str().into(),
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        for facility_name in &filter.facility_name {
-            queries.queries.push(Query {
-                prop: "facilityName".to_string(),
-                op: "=".parse().unwrap(),
-                value: facility_name.as_str().into(),
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        for cni in &filter.cni {
-            queries.queries.push(Query {
-                prop: "cni".to_string(),
-                op: "=".parse().unwrap(),
-                value: cni.as_str().into(),
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        for id in &filter.point_id {
-            queries.queries.push(Query {
-                prop: "pointId".to_string(),
-                op: "=".parse().unwrap(),
-                value: id.point.into(),
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        if let Some(value) = &filter.value {
-            if let Some(from) = value.value_from {
-                queries.queries.push(Query {
-                    prop: "value".to_string(),
-                    op: ">=".parse().unwrap(),
-                    value: from.into(),
-                });
-            }
-            if let Some(to) = value.value_to {
-                queries.queries.push(Query {
-                    prop: "value".to_string(),
-                    op: "<=".parse().unwrap(),
-                    value: to.into(),
-                });
-            }
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-        for reason in &filter.reason {
-            let reason = match serde_json::to_value(reason) {
-                Ok(reason) => reason,
-                Err(e) => {
-                    error!("Failed to serialize reason: {e}");
-                    continue;
-                }
-            };
-
-            queries.queries.push(Query {
-                prop: "reason".to_string(),
-                op: "=".parse().unwrap(),
-                value: reason,
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let mut queries = Queries {
-            query_type: QueryType::Or,
-            queries: vec![],
-        };
-
-        for affect in &filter.affect {
-            queries.queries.push(Query {
-                prop: "affect".to_string(),
-                op: "=".parse().unwrap(),
-                value: affect.as_str().into(),
-            });
-        }
-        complex_queries.queries.push(queries);
-
-        let pagination = Pagination {
-            limit: count,
-            page,
-            reverse: true,
-            sort_key: Some("timestamp".to_string()),
-        };
-
-        match db::load_histories(complex_queries, pagination) {
-            Ok(info) => Ok(info),
+        // Fetch the total count of records first
+        let initial_histories = match data_manager::history::get(params.clone().into()).await {
+            Ok(histories) => histories,
             Err(e) => {
-                error!("Failed to load histories: {e}");
-                Err(e)
+                error!("Failed to get histories: {e}");
+                return Ok(Response::err(format!("Failed to get histories: {e}")));
+            }
+        };
+
+        let total_count = initial_histories.count;
+
+        // Check if total_count exceeds the limit
+        if total_count > 20000 {
+            return Ok(Response::err(
+                "Cannot fetch more than 20000 records.".to_string(),
+            ));
+        }
+
+        info!("Total count: {total_count}");
+
+        // Calculate the number of pages needed based on params.count
+        let count_per_page = params.count.unwrap_or(1000); // 기본값을 1000으로 설정
+        let total_pages = total_count.div_ceil(count_per_page); // 올림 계산
+
+        info!("Total pages: {total_pages}");
+
+        // Loop to fetch records in batches
+        for page in 0..total_pages {
+            let mut paged_params = params.clone();
+            paged_params.page = Some(page); // Set the current page
+
+            let histories = match data_manager::history::get(paged_params.into()).await {
+                Ok(histories) => histories,
+                Err(e) => {
+                    error!("Failed to get histories: {e}");
+                    return Ok(Response::err(format!("Failed to get histories: {e}")));
+                }
+            };
+
+            // If no more records are returned, break the loop
+            if histories.records.is_empty() {
+                break;
+            }
+
+            for record in histories.records {
+                histories_records.push(record);
             }
         }
+
+        // CSV 내보내기에만 사용할 struct와 impl
+        #[derive(serde::Serialize)]
+        struct CsvHistoryRecord {
+            timestamp: i64,
+            #[serde(rename = "facilityName")]
+            facility_name: Option<String>,
+            #[serde(rename = "facilityType")]
+            facility_type: Option<String>,
+            #[serde(rename = "facilityAddress")]
+            facility_address: Option<u32>,
+            #[serde(rename = "pointId")]
+            point_id: Option<u32>,
+            #[serde(rename = "facilityId")]
+            facility_id: Option<u32>,
+            #[serde(rename = "groupId")]
+            group_id: Option<u32>,
+            #[serde(rename = "groupName")]
+            group_name: Option<String>,
+            event: String,
+            cni: Option<String>,
+            #[serde(rename = "cniValue")]
+            cni_value: Option<String>,
+            value: Option<f32>,
+            state: Option<String>,
+            #[serde(rename = "statusFrom")]
+            status_from: Option<String>,
+            #[serde(rename = "statusTo")]
+            status_to: Option<String>,
+            desc: Option<String>,
+            reason: Option<String>,
+            affect: String,
+        }
+    
+        impl From<&platform_common_types::core::history::HistoryRecord> for CsvHistoryRecord {
+            fn from(hr: &platform_common_types::core::history::HistoryRecord) -> Self {
+                // 소문자 시작 변환 함수
+                fn first_lowercase(s: &str) -> String {
+                    let mut c = s.chars();
+                    match c.next() {
+                        None => String::new(),
+                        Some(f) => f.to_lowercase().collect::<String>() + c.as_str(),
+                    }
+                }
+                // enum용 변환 함수 (Debug trait 이용)
+                fn enum_to_lower_string<T: std::fmt::Debug>(e: &T) -> String {
+                    first_lowercase(&format!("{:?}", e))
+                }
+    
+                CsvHistoryRecord {
+                    timestamp: hr.timestamp,
+                    facility_name: hr.facility_name.clone(),
+                    facility_type: hr.facility_type.clone(),
+                    facility_address: hr.facility_address,
+                    point_id: hr.point_id,
+                    facility_id: hr.facility_id,
+                    group_id: hr.group_id,
+                    group_name: hr.group_name.clone(),
+                    event: enum_to_lower_string(&hr.event),
+                    cni: hr.cni.clone(),
+                    cni_value: hr.cni_value.clone(),
+                    value: hr.value,
+                    state: hr.state.clone(),
+                    status_from: hr.status_from.as_ref().map(enum_to_lower_string),
+                    status_to: hr.status_to.as_ref().map(enum_to_lower_string),
+                    desc: hr.desc.clone(),
+                    reason: hr.reason.as_ref().map(|r| format!("{:?}", r)),
+                    affect: hr.affect.clone(),
+                }
+            }
+        }
+
+        let mut wtr = WriterBuilder::new().from_writer(vec![]);
+        for record in histories_records {
+            if let Err(e) = wtr.serialize(CsvHistoryRecord::from(&record)) {
+                error!("Failed to write record to CSV: {e}");
+                return Ok(Response::err(format!("Failed to write record to CSV: {e}")));
+            }
+        }
+
+        // CSV 데이터를 Vec<u8>로 가져오기
+        let data = wtr.into_inner().map_err(|e| {
+            error!("Failed to finalize CSV writer: {e}");
+            warp::reject::not_found() // 적절한 오류 처리
+        })?;
+
+        // CSV 데이터를 String으로 변환
+        let csv_data = String::from_utf8(data).map_err(|e| {
+            error!("Failed to convert CSV data to String: {e}");
+            warp::reject::not_found() // 적절한 오류 처리
+        })?;
+
+        // Create a filename based on the parameters
+        let default_filename = "histories.csv".to_string();
+        let filename = if let (Some(start_data), Some(end_data)) = (
+            Utc.timestamp_opt(params.timestamp_from.unwrap_or(0), 0)
+                .single(),
+            Utc.timestamp_opt(params.timestamp_to.unwrap_or(0), 0)
+                .single(),
+        ) {
+            let formatted_start_date = start_data.format("%Y-%m-%d").to_string();
+            let formatted_end_date = end_data.format("%Y-%m-%d").to_string();
+            format!(
+                "histories_{}_{}.csv",
+                formatted_start_date, formatted_end_date
+            )
+        } else {
+            default_filename
+        };
+
+        // CSV 응답을 반환
+        let response = Response::ok_with_csv(csv_data, filename);
+        Ok(response)
     }
-}
 
 
 
-내부적으로는 해당 함수를 써.
+
+
+    그럼 이 코드에서 어떻게 수정하면 될까? 나는 git 으로 관리하고 있어서 변경되어야할 부분만 변경되었으면 좋곘어. 변경한 전체 함수를 줘
+    
